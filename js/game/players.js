@@ -12,7 +12,6 @@
 import { TILE } from './field.js';
 
 const HALF = 0.40;          // hitbox half-extent in tiles
-const NUDGE_PX = 0.30;      // axis re-centering speed in tiles/sec when single-axis
 
 export function createPlayer(slot, schemeId, charId, controllerType, displayName){
   return {
@@ -58,25 +57,13 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles){
   if(dx !== 0){
     const nx = p.x + dx * p.speed * dt;
     if(canFit(field, nx, p.y, solidBombTiles)) p.x = nx;
-  } else {
-    p.x = nudgeToward(p.x, dt);
   }
 
   /* Y step */
   if(dy !== 0){
     const ny = p.y + dy * p.speed * dt;
     if(canFit(field, p.x, ny, solidBombTiles)) p.y = ny;
-  } else {
-    p.y = nudgeToward(p.y, dt);
   }
-}
-
-function nudgeToward(v, dt){
-  const target = Math.floor(v) + 0.5;
-  const d = target - v;
-  if(Math.abs(d) < 0.01) return target;
-  const step = NUDGE_PX * dt * Math.sign(d);
-  return Math.abs(step) >= Math.abs(d) ? target : v + step;
 }
 
 /* True iff a HALF-sized AABB centered at (cx,cy) sits on walkable tiles only.

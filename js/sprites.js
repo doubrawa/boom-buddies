@@ -216,19 +216,19 @@ export function drawExArm(c){
   for(let x = 0; x < 16; x++){ px(c, x, 4, INK); px(c, x, 11, INK); }
 }
 
-/* ---------- HEART (8x8) ---------- */
+/* ---------- HEART (8x8) — vertically centered: occupies rows 2..6 ---------- */
 export function drawHeart(c, empty){
   const R = empty ? '#d8c8e0' : '#ff6b9d', H = '#ffb3c8', D = empty ? '#a89aab' : '#c84277';
-  rect(c, 1, 1, 2, 1, R); rect(c, 5, 1, 2, 1, R);
-  rect(c, 1, 2, 6, 1, R);
-  rect(c, 2, 3, 4, 1, R);
-  rect(c, 3, 4, 2, 1, D);
-  px(c, 2, 1, H);
-  px(c, 0, 1, INK); px(c, 3, 1, INK); px(c, 4, 1, INK); px(c, 7, 1, INK);
-  px(c, 0, 2, INK); px(c, 7, 2, INK);
-  px(c, 1, 3, INK); px(c, 6, 3, INK);
-  px(c, 2, 4, INK); px(c, 5, 4, INK);
-  px(c, 3, 5, INK); px(c, 4, 5, INK);
+  rect(c, 1, 2, 2, 1, R); rect(c, 5, 2, 2, 1, R);
+  rect(c, 1, 3, 6, 1, R);
+  rect(c, 2, 4, 4, 1, R);
+  rect(c, 3, 5, 2, 1, D);
+  px(c, 2, 2, H);
+  px(c, 0, 2, INK); px(c, 3, 2, INK); px(c, 4, 2, INK); px(c, 7, 2, INK);
+  px(c, 0, 3, INK); px(c, 7, 3, INK);
+  px(c, 1, 4, INK); px(c, 6, 4, INK);
+  px(c, 2, 5, INK); px(c, 5, 5, INK);
+  px(c, 3, 6, INK); px(c, 4, 6, INK);
 }
 
 /* ---------- POWER-UPS (16x16) ---------- */

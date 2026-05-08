@@ -194,40 +194,40 @@ function renderPlayers(view, players){
 
 function renderBombs(view, bombs){
   if(!view.bombSprites) view.bombSprites = new Map();
-  /* Add divs for new bombs, update existing. */
   const seen = new Set();
   for(const b of bombs){
     seen.add(b.id);
     let entry = view.bombSprites.get(b.id);
     if(!entry){
-      const div = makeEntityDiv(BOMB_PX);
-      div.className = 'bomb-sprite breathe';
+      /* Two-div trick: outer holds the position transform, inner runs the
+         CSS animation transform.  If both lived on one element the keyframe
+         transform would override the inline one and the bomb would snap to (0,0). */
+      const wrap = makePosWrapper();
+      const inner = makeAnimatedSprite('bomb-sprite breathe', BOMB_PX);
       const cv = bombCanvas(false);
       cv.style.width = BOMB_PX + 'px';
       cv.style.height = BOMB_PX + 'px';
-      div.appendChild(cv);
-      view.bombLayer.appendChild(div);
-      entry = { div, hot: false };
+      inner.appendChild(cv);
+      wrap.appendChild(inner);
+      view.bombLayer.appendChild(wrap);
+      entry = { wrap, inner, hot: false };
       view.bombSprites.set(b.id, entry);
     }
-    /* Position at the center of its tile. */
-    entry.div.style.transform = `translate(${((b.x + 0.5) * TS).toFixed(2)}px, ${((b.y + 0.5) * TS).toFixed(2)}px)`;
-    /* Switch to hot sprite + animation in the last second. */
+    entry.wrap.style.transform = `translate(${((b.x + 0.5) * TS).toFixed(2)}px, ${((b.y + 0.5) * TS).toFixed(2)}px)`;
     const shouldBeHot = b.fuse <= HOT_THRESHOLD;
     if(shouldBeHot && !entry.hot){
       entry.hot = true;
-      entry.div.className = 'bomb-sprite hot-pulse';
-      entry.div.innerHTML = '';
+      entry.inner.className = 'bomb-sprite hot-pulse';
+      entry.inner.innerHTML = '';
       const cv = bombCanvas(true);
       cv.style.width = BOMB_PX + 'px';
       cv.style.height = BOMB_PX + 'px';
-      entry.div.appendChild(cv);
+      entry.inner.appendChild(cv);
     }
   }
-  /* Reap bombs that no longer exist (detonated). */
   for(const [id, entry] of view.bombSprites){
     if(!seen.has(id)){
-      entry.div.remove();
+      entry.wrap.remove();
       view.bombSprites.delete(id);
     }
   }
@@ -240,37 +240,58 @@ function renderExplosions(view, explosions){
     seen.add(e);
     let entry = view.explosionSprites.get(e);
     if(!entry){
-      const segs = [];
+      const wraps = [];
       for(const s of e.segments){
-        const div = makeEntityDiv(EX_PX);
-        div.className = 'pulse-fast';
-        div.style.transform = `translate(${((s.x + 0.5) * TS).toFixed(2)}px, ${((s.y + 0.5) * TS).toFixed(2)}px)`;
+        const wrap = makePosWrapper();
+        const inner = makeAnimatedSprite('pulse-fast', EX_PX);
+        wrap.style.transform = `translate(${((s.x + 0.5) * TS).toFixed(2)}px, ${((s.y + 0.5) * TS).toFixed(2)}px)`;
         let cv;
         if(s.kind === 'center') cv = exCenterCanvas();
         else if(s.kind === 'arm-h') cv = exArmCanvas(0);
         else cv = exArmCanvas(90);
         cv.style.width = EX_PX + 'px';
         cv.style.height = EX_PX + 'px';
-        div.appendChild(cv);
-        view.explosionLayer.appendChild(div);
-        segs.push(div);
+        inner.appendChild(cv);
+        wrap.appendChild(inner);
+        view.explosionLayer.appendChild(wrap);
+        wraps.push(wrap);
       }
-      entry = { segs };
+      entry = { wraps };
       view.explosionSprites.set(e, entry);
     }
-    /* Fade with remaining ttl. */
     const opacity = Math.max(0, Math.min(1, e.ttl / 0.45));
-    for(const d of entry.segs) d.style.opacity = opacity.toFixed(2);
+    for(const w of entry.wraps) w.style.opacity = opacity.toFixed(2);
   }
-  /* Remove faded explosions. */
   for(const [e, entry] of view.explosionSprites){
     if(!seen.has(e)){
-      for(const d of entry.segs) d.remove();
+      for(const w of entry.wraps) w.remove();
       view.explosionSprites.delete(e);
     }
   }
 }
 
+/* Outer position wrapper — owns the translate(x,y) for placement.
+   Has zero size; children are absolutely positioned within. */
+function makePosWrapper(){
+  const div = document.createElement('div');
+  div.style.cssText = 'position:absolute; left:0; top:0; will-change: transform;';
+  return div;
+}
+
+/* Inner sprite — owns the CSS animation that applies its own transform.
+   Centered around the wrapper origin via negative margins. */
+function makeAnimatedSprite(animClass, px){
+  const div = document.createElement('div');
+  div.className = animClass;
+  div.style.cssText = `
+    position:absolute;
+    width:${px}px; height:${px}px;
+    margin-left:${-px/2}px; margin-top:${-px/2}px;
+  `;
+  return div;
+}
+
+/* Player sprite has no CSS animation, so position transform stays put. */
 function makeEntityDiv(px){
   const div = document.createElement('div');
   div.style.cssText = `
