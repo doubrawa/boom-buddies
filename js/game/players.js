@@ -26,12 +26,18 @@ export function createPlayer(slot, schemeId, charId, controllerType, displayName
     speed: 4.5,                // tiles per second
     facing: 'down',
     alive: true,
-    bombHeld: false,
+    bombMax: 1,                // max simultaneous live bombs
+    bombsLive: 0,              // currently ticking
+    range: 2,                  // explosion arm length
+    /* Bombs that this player overlaps and has not yet stepped off of.
+       While in this set, they don't block the player's movement. */
+    passthrough: new Set(),
   };
 }
 
-/* Move one player by dt seconds along (dx,dy), respecting field collisions. */
-export function stepPlayer(p, dx, dy, dt, field){
+/* Move one player by dt seconds along (dx,dy), respecting field collisions
+   plus any solid bombs (those NOT in this player's passthrough set). */
+export function stepPlayer(p, dx, dy, dt, field, solidBombTiles){
   if(!p.alive) return;
 
   /* normalise so diagonals aren't faster */
@@ -51,7 +57,7 @@ export function stepPlayer(p, dx, dy, dt, field){
      remaining gap is ≤ one frame's movement (≤ 4 px at 60fps), invisible. */
   if(dx !== 0){
     const nx = p.x + dx * p.speed * dt;
-    if(canFit(field, nx, p.y)) p.x = nx;
+    if(canFit(field, nx, p.y, solidBombTiles)) p.x = nx;
   } else {
     p.x = nudgeToward(p.x, dt);
   }
@@ -59,7 +65,7 @@ export function stepPlayer(p, dx, dy, dt, field){
   /* Y step */
   if(dy !== 0){
     const ny = p.y + dy * p.speed * dt;
-    if(canFit(field, p.x, ny)) p.y = ny;
+    if(canFit(field, p.x, ny, solidBombTiles)) p.y = ny;
   } else {
     p.y = nudgeToward(p.y, dt);
   }
@@ -73,8 +79,10 @@ function nudgeToward(v, dt){
   return Math.abs(step) >= Math.abs(d) ? target : v + step;
 }
 
-/* True iff a HALF-sized AABB centered at (cx,cy) sits on walkable tiles only. */
-function canFit(field, cx, cy){
+/* True iff a HALF-sized AABB centered at (cx,cy) sits on walkable tiles only.
+   `solidBombTiles` is an optional Set of "x,y" keys that should be treated
+   as blocking (bombs the player is not allowed to walk through). */
+function canFit(field, cx, cy, solidBombTiles){
   const x0 = Math.floor(cx - HALF);
   const x1 = Math.floor(cx + HALF);
   const y0 = Math.floor(cy - HALF);
@@ -82,8 +90,22 @@ function canFit(field, cx, cy){
   for(let y = y0; y <= y1; y++){
     for(let x = x0; x <= x1; x++){
       if(field.at(x, y) !== TILE.FLOOR) return false;
+      if(solidBombTiles && solidBombTiles.has(x + ',' + y)) return false;
     }
   }
   return true;
+}
+
+/* Tiles whose AABB the player currently overlaps. */
+export function tilesUnderPlayer(p){
+  const x0 = Math.floor(p.x - HALF);
+  const x1 = Math.floor(p.x + HALF);
+  const y0 = Math.floor(p.y - HALF);
+  const y1 = Math.floor(p.y + HALF);
+  const out = [];
+  for(let y = y0; y <= y1; y++)
+    for(let x = x0; x <= x1; x++)
+      out.push([x, y]);
+  return out;
 }
 
