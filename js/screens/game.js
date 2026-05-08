@@ -1,45 +1,54 @@
 import {
-  charCanvas, boxCanvas, pillarCanvas, heartCanvas, pupCanvas,
-  bombCanvas, exCenterCanvas, exArmCanvas,
-  PUPS, CHARS,
+  charSvg, bombSvg, pupSvg, icoSvg, crownSvg, heartSvg,
+  blastCenterSvg, blastArmSvg,
+  PUPS, ALL_PUP_IDS, CHARS,
 } from '../sprites.js';
-import { GHOST_DURATION } from '../game/pickups.js';
 import { createEngine } from '../game/engine.js';
-import { TILE, FIELD_PRESETS } from '../game/field.js';
+import { TILE } from '../game/field.js';
 import { SCHEME_LABEL } from '../game/input.js';
 import { HOT_THRESHOLD } from '../game/bombs.js';
 
-const TS = 42;                 // tile pixel size — must match CSS .board --ts
-const PLAYER_PX = 38;          // player sprite display size
-const BOMB_PX = 32;            // bomb sprite display size
-const EX_PX = 38;              // explosion piece display size
-const PICKUP_PX = 28;          // pickup sprite display size
+const TS = 42;                 // tile size in px — matches CSS .board --ts
+const PLAYER_SIZE = 40;        // sprite display size in px
+const BOMB_SIZE = 36;
+const BLAST_SIZE = 40;
+const PICKUP_SIZE = 28;
 
 let engine = null;
 let timerHandle = null;
 let endTransitionHandle = null;
 
-const ROUND_END_DELAY_MS = 1500;   // beat for the killing explosion to fade
+const ROUND_END_DELAY_MS = 1500;
+
+const SCHEME_KEY_LABEL = {
+  wasd:   { move: 'WASD',  bomb: '␣' },
+  arrows: { move: '↑↓←→', bomb: '⏎' },
+  ijkl:   { move: 'IJKL',  bomb: 'U' },
+  numpad: { move: '8456',  bomb: '0' },
+};
 
 export function render(ctx){
   const { app, navigate, lobby, match } = ctx;
   const section = document.createElement('section');
-  section.className = 'screen gp active';
+  section.className = 'screen active';
   const initialSecs = lobby.timeLimit || 0;
+
   section.innerHTML = `
     <div class="gp">
       <div class="gpcol left" id="leftHud"></div>
 
       <div class="stage">
         <div class="topbar">
-          <div class="round-pill">ROUND&nbsp;${match.current}/${match.rounds}</div>
-          <div class="timer" id="timer">${initialSecs > 0 ? formatTime(initialSecs) : '∞'}</div>
-          <div class="live">● LIVE</div>
-          <button class="end-round" data-action="end-round">FORFEIT ▶</button>
+          <div class="round-pill">Round ${match.current} / ${match.rounds}</div>
+          <div class="timer"><span class="dot"></span><span data-timer>${initialSecs > 0 ? formatTime(initialSecs) : '∞'}</span></div>
+          <div class="live-pill"><span class="blip"></span>LIVE</div>
+          <button class="end-round" data-action="end-round">Forfeit ▶</button>
         </div>
+
         <div class="board" id="board"></div>
+
         <div class="pup-row">
-          <h4><span class="dot"></span>POWER-UPS · ALL 12 PICK-UPS</h4>
+          <h4><span class="pip"></span>Power-ups · all 12 pickups</h4>
           <div class="pup-grid" id="pupGrid"></div>
         </div>
       </div>
@@ -49,10 +58,10 @@ export function render(ctx){
   `;
   app.appendChild(section);
 
-  /* Spin up the engine.  It owns the round timer; we mirror it visually below. */
+  /* Engine. */
   const view = {};
   engine = createEngine(lobby, {
-    onEvents: (events) => handleEvents(events, view),
+    onEvents: (events) => handleEvents(events, view, engine),
     onRender: () => {
       renderPlayers(view, engine.players, engine.elapsed);
       renderBombs(view, engine.bombs);
@@ -62,23 +71,21 @@ export function render(ctx){
     onRoundEnd: (result) => scheduleRoundEnd(ctx, result),
   });
 
+  /* Build static board + layers. */
   const boardEl = section.querySelector('#board');
   buildBoard(boardEl, engine.field, view);
   buildPowerupRow(section.querySelector('#pupGrid'));
 
-  /* HUD reflects the current match roster. */
+  /* HUD cards. */
   const lh = section.querySelector('#leftHud');
   const rh = section.querySelector('#rightHud');
-  const half = Math.ceil(engine.players.length / 2);
   view.hudByIdx = new Map();
+  const half = Math.ceil(engine.players.length / 2);
   engine.players.slice(0, half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); lh.appendChild(c); });
   engine.players.slice(half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); rh.appendChild(c); });
 
-  const pupRow = section.querySelector('.pup-row');
-  pupRow.style.width = (engine.field.width * TS + 8) + 'px';
-
-  /* Visual timer mirrors engine.elapsed against lobby.timeLimit. */
-  const timerEl = section.querySelector('#timer');
+  /* Visual timer. */
+  const timerEl = section.querySelector('[data-timer]');
   if(initialSecs > 0){
     timerHandle = setInterval(() => {
       const remaining = Math.max(0, Math.ceil(initialSecs - engine.elapsed));
@@ -87,23 +94,22 @@ export function render(ctx){
     }, 250);
   }
 
-  /* Forfeit button: produce a draw result for this round. */
+  /* Forfeit. */
   section.querySelector('[data-action="end-round"]').addEventListener('click', () => {
     if(endTransitionHandle != null) return;
-    const result = {
+    scheduleRoundEnd(ctx, {
       winnerIdx: null,
       durationSec: engine ? engine.elapsed : 0,
       kos: new Map(),
       reason: 'forfeit',
-    };
-    scheduleRoundEnd(ctx, result);
+    });
   });
 
   engine.start();
 }
 
 function scheduleRoundEnd(ctx, result){
-  if(endTransitionHandle != null) return;   // already scheduled
+  if(endTransitionHandle != null) return;
   stopTimer();
   endTransitionHandle = setTimeout(() => {
     endTransitionHandle = null;
@@ -124,11 +130,11 @@ function formatTime(s){ const m = Math.floor(s/60), ss = String(s%60).padStart(2
 /* ============ BOARD CONSTRUCTION ============ */
 
 function buildBoard(boardEl, field, view){
+  /* Board CSS uses --ts; size the grid to the actual field. */
   boardEl.style.gridTemplateColumns = `repeat(${field.width}, ${TS}px)`;
   boardEl.style.gridTemplateRows    = `repeat(${field.height}, ${TS}px)`;
   boardEl.style.position = 'relative';
 
-  /* Keep an array of tile divs so we can remove box sprites on destruction. */
   view.tileEls = new Array(field.width * field.height);
 
   for(let y = 0; y < field.height; y++){
@@ -137,19 +143,19 @@ function buildBoard(boardEl, field, view){
       t.className = 'tile';
       const v = field.at(x, y);
       if(v === TILE.PILLAR){
-        t.appendChild(pillarCanvas());
+        t.classList.add('stone');
+      } else if(v === TILE.BOX){
+        t.classList.add('grass', 'crate');
       } else {
-        t.classList.add('floor');
-        if((x + y) % 2) t.classList.add('b');
-        if(v === TILE.BOX) t.appendChild(boxCanvas());
+        t.classList.add('grass');
+        if((x + y) % 2 === 0) t.classList.add('b');
       }
       boardEl.appendChild(t);
       view.tileEls[y * field.width + x] = t;
     }
   }
 
-  /* Layers stacked over the grid in z-order: pickups under bombs under
-     players under explosions. */
+  /* Layer stack. */
   view.pickupLayer    = makeLayer(field, 2);
   view.bombLayer      = makeLayer(field, 3);
   view.playerLayer    = makeLayer(field, 5);
@@ -165,7 +171,7 @@ function buildBoard(boardEl, field, view){
 function makeLayer(field, z){
   const el = document.createElement('div');
   el.style.cssText = `
-    position:absolute; left:4px; top:4px;
+    position:absolute; left:0; top:0;
     width:${field.width * TS}px; height:${field.height * TS}px;
     pointer-events:none; z-index:${z};
   `;
@@ -178,31 +184,29 @@ function renderPlayers(view, players, elapsed){
   if(!view.playerSprites){
     view.playerSprites = new Map();
     for(const p of players){
-      const div = makeEntityDiv(PLAYER_PX);
-      const cv = charCanvas(p.charId);
-      cv.style.width = PLAYER_PX + 'px';
-      cv.style.height = PLAYER_PX + 'px';
-      div.appendChild(cv);
-      view.playerLayer.appendChild(div);
-      view.playerSprites.set(p.idx, div);
+      const wrap = makePosWrapper();
+      const inner = makeSpriteHolder(PLAYER_SIZE);
+      inner.appendChild(charSvg(p.charId, PLAYER_SIZE));
+      wrap.appendChild(inner);
+      view.playerLayer.appendChild(wrap);
+      view.playerSprites.set(p.idx, { wrap, inner });
     }
   }
   for(const p of players){
-    const div = view.playerSprites.get(p.idx);
-    if(!div) continue;
-    div.style.transform = `translate(${(p.x * TS).toFixed(2)}px, ${(p.y * TS).toFixed(2)}px)`;
+    const entry = view.playerSprites.get(p.idx);
+    if(!entry) continue;
+    entry.wrap.style.transform = `translate(${(p.x * TS).toFixed(2)}px, ${(p.y * TS).toFixed(2)}px)`;
     if(!p.alive){
-      div.style.filter = 'grayscale(.7) opacity(.5)';
-      div.style.zIndex = '1';
+      entry.inner.style.filter = 'grayscale(.7) opacity(.5)';
+      entry.wrap.style.zIndex = '1';
     } else {
-      /* Active visuals: ghost = translucent, slowed = blue tint, shield = gold ring. */
       let filter = '';
       const ghosting = elapsed != null && elapsed < p.ghostUntil;
       const slowed   = elapsed != null && elapsed < p.slowUntil;
       if(ghosting) filter += 'opacity(.55) ';
       if(slowed)   filter += 'hue-rotate(180deg) ';
-      if(p.shieldStacks > 0) filter += 'drop-shadow(0 0 3px #ffe79e) ';
-      div.style.filter = filter.trim();
+      if(p.shieldStacks > 0) filter += 'drop-shadow(0 0 6px #ffd76b) ';
+      entry.inner.style.filter = filter.trim();
     }
   }
 }
@@ -214,15 +218,10 @@ function renderBombs(view, bombs){
     seen.add(b.id);
     let entry = view.bombSprites.get(b.id);
     if(!entry){
-      /* Two-div trick: outer holds the position transform, inner runs the
-         CSS animation transform.  If both lived on one element the keyframe
-         transform would override the inline one and the bomb would snap to (0,0). */
       const wrap = makePosWrapper();
-      const inner = makeAnimatedSprite('bomb-sprite breathe', BOMB_PX);
-      const cv = bombCanvas(false);
-      cv.style.width = BOMB_PX + 'px';
-      cv.style.height = BOMB_PX + 'px';
-      inner.appendChild(cv);
+      const inner = makeSpriteHolder(BOMB_SIZE);
+      inner.classList.add('breathe');
+      inner.appendChild(bombSvg(false, BOMB_SIZE));
       wrap.appendChild(inner);
       view.bombLayer.appendChild(wrap);
       entry = { wrap, inner, hot: false };
@@ -232,19 +231,14 @@ function renderBombs(view, bombs){
     const shouldBeHot = b.fuse <= HOT_THRESHOLD;
     if(shouldBeHot && !entry.hot){
       entry.hot = true;
-      entry.inner.className = 'bomb-sprite hot-pulse';
+      entry.inner.classList.remove('breathe');
+      entry.inner.classList.add('hot-pulse');
       entry.inner.innerHTML = '';
-      const cv = bombCanvas(true);
-      cv.style.width = BOMB_PX + 'px';
-      cv.style.height = BOMB_PX + 'px';
-      entry.inner.appendChild(cv);
+      entry.inner.appendChild(bombSvg(true, BOMB_SIZE));
     }
   }
   for(const [id, entry] of view.bombSprites){
-    if(!seen.has(id)){
-      entry.wrap.remove();
-      view.bombSprites.delete(id);
-    }
+    if(!seen.has(id)){ entry.wrap.remove(); view.bombSprites.delete(id); }
   }
 }
 
@@ -258,15 +252,14 @@ function renderExplosions(view, explosions){
       const wraps = [];
       for(const s of e.segments){
         const wrap = makePosWrapper();
-        const inner = makeAnimatedSprite('pulse-fast', EX_PX);
+        const inner = makeSpriteHolder(BLAST_SIZE);
+        inner.classList.add('pulse-fast');
         wrap.style.transform = `translate(${((s.x + 0.5) * TS).toFixed(2)}px, ${((s.y + 0.5) * TS).toFixed(2)}px)`;
-        let cv;
-        if(s.kind === 'center') cv = exCenterCanvas();
-        else if(s.kind === 'arm-h') cv = exArmCanvas(0);
-        else cv = exArmCanvas(90);
-        cv.style.width = EX_PX + 'px';
-        cv.style.height = EX_PX + 'px';
-        inner.appendChild(cv);
+        let svg;
+        if(s.kind === 'center') svg = blastCenterSvg(BLAST_SIZE);
+        else if(s.kind === 'arm-h') svg = blastArmSvg(BLAST_SIZE, false);
+        else svg = blastArmSvg(BLAST_SIZE, true);
+        inner.appendChild(svg);
         wrap.appendChild(inner);
         view.explosionLayer.appendChild(wrap);
         wraps.push(wrap);
@@ -293,11 +286,13 @@ function renderPickups(view, pickups){
     let entry = view.pickupSprites.get(pk.id);
     if(!entry){
       const wrap = makePosWrapper();
-      const inner = makeAnimatedSprite('pulse-slow', PICKUP_PX);
-      const cv = pupCanvas(pk.type);
-      cv.style.width = PICKUP_PX + 'px';
-      cv.style.height = PICKUP_PX + 'px';
-      inner.appendChild(cv);
+      const inner = makeSpriteHolder(PICKUP_SIZE);
+      inner.classList.add('pulse-slow');
+      const meta = PUPS[pk.type] || PUPS.bomb;
+      const chip = document.createElement('span');
+      chip.style.cssText = `display:flex; align-items:center; justify-content:center; width:${PICKUP_SIZE}px; height:${PICKUP_SIZE}px; background:${meta.bg}; border:2.5px solid var(--ink); border-radius:10px; box-shadow:0 3px 0 rgba(43,33,80,.18)`;
+      chip.appendChild(pupSvg(pk.type, PICKUP_SIZE - 14));
+      inner.appendChild(chip);
       wrap.appendChild(inner);
       wrap.style.transform = `translate(${((pk.x + 0.5) * TS).toFixed(2)}px, ${((pk.y + 0.5) * TS).toFixed(2)}px)`;
       view.pickupLayer.appendChild(wrap);
@@ -306,55 +301,35 @@ function renderPickups(view, pickups){
     }
   }
   for(const [id, entry] of view.pickupSprites){
-    if(!seen.has(id)){
-      entry.wrap.remove();
-      view.pickupSprites.delete(id);
-    }
+    if(!seen.has(id)){ entry.wrap.remove(); view.pickupSprites.delete(id); }
   }
 }
 
-/* Outer position wrapper — owns the translate(x,y) for placement.
-   Has zero size; children are absolutely positioned within. */
+/* ============ DOM HELPERS ============ */
+
 function makePosWrapper(){
   const div = document.createElement('div');
   div.style.cssText = 'position:absolute; left:0; top:0; will-change: transform;';
   return div;
 }
-
-/* Inner sprite — owns the CSS animation that applies its own transform.
-   Centered around the wrapper origin via negative margins. */
-function makeAnimatedSprite(animClass, px){
+function makeSpriteHolder(size){
   const div = document.createElement('div');
-  div.className = animClass;
   div.style.cssText = `
     position:absolute;
-    width:${px}px; height:${px}px;
-    margin-left:${-px/2}px; margin-top:${-px/2}px;
+    width:${size}px; height:${size}px;
+    margin-left:${-size/2}px; margin-top:${-size/2}px;
+    display:flex; align-items:center; justify-content:center;
   `;
   return div;
 }
 
-/* Player sprite has no CSS animation, so position transform stays put. */
-function makeEntityDiv(px){
-  const div = document.createElement('div');
-  div.style.cssText = `
-    position:absolute;
-    width:${px}px; height:${px}px;
-    margin-left:${-px/2}px; margin-top:${-px/2}px;
-    will-change: transform;
-  `;
-  return div;
-}
+/* ============ EVENTS ============ */
 
-/* ============ EVENT HANDLERS ============ */
-
-function handleEvents(events, view){
+function handleEvents(events, view, engine){
   for(const ev of events){
     if(ev.type === 'boxBroken'){
       const t = view.tileEls[ev.y * view.fieldWidth + ev.x];
-      if(t){
-        while(t.firstChild) t.removeChild(t.firstChild);
-      }
+      if(t){ t.classList.remove('crate'); }
     } else if(ev.type === 'playerKilled'){
       const card = view.hudByIdx.get(ev.idx);
       if(card) card.classList.add('dead');
@@ -363,9 +338,11 @@ function handleEvents(events, view){
       if(card){
         const pups = card.querySelector('[data-pups]');
         if(pups){
+          const meta = PUPS[ev.pickup.type] || PUPS.bomb;
           const slot = document.createElement('span');
           slot.className = 'pup';
-          slot.appendChild(pupCanvas(ev.pickup.type));
+          slot.style.background = meta.bg;
+          slot.appendChild(pupSvg(ev.pickup.type, 18));
           pups.appendChild(slot);
         }
       }
@@ -373,44 +350,75 @@ function handleEvents(events, view){
   }
 }
 
-/* ============ HUD + POWER-UP ROW ============ */
+/* ============ HUD + PUP REFERENCE ============ */
 
 function buildPowerupRow(grid){
-  Object.keys(PUPS).forEach(id => {
+  for(const id of ALL_PUP_IDS){
+    const meta = PUPS[id]; if(!meta) continue;
     const cell = document.createElement('div');
     cell.className = 'pup-cell';
-    cell.appendChild(pupCanvas(id));
-    const text = document.createElement('span');
-    text.innerHTML = `<span class="nm">${PUPS[id].nm}</span><span class="ds">${PUPS[id].ds}</span>`;
-    cell.appendChild(text);
+    const iconSlot = document.createElement('span');
+    iconSlot.className = 'icon';
+    iconSlot.style.background = meta.bg;
+    iconSlot.appendChild(pupSvg(id, 22));
+    const info = document.createElement('span');
+    info.className = 'info';
+    info.innerHTML = `<span class="nm">${meta.nm}</span><span class="ds">${meta.ds}</span>`;
+    cell.appendChild(iconSlot);
+    cell.appendChild(info);
     grid.appendChild(cell);
-  });
+  }
 }
 
 function buildHudCard(p, match){
   const card = document.createElement('div');
   card.className = 'pcard';
   card.dataset.idx = p.idx;
-  /* Cumulative wins from earlier rounds, if any. */
   const matchPlayer = match?.players?.find(x => x.idx === p.idx);
   const wins = matchPlayer?.score || 0;
-  const ctrlLabel = p.scheme ? SCHEME_LABEL[p.scheme] : (p.type === 'cpu' ? 'CPU' : '—');
+  if(wins > 0 && (match?.players?.[0]?.idx === p.idx)) card.classList.add('lead');
+
+  /* Control row text. */
+  let ctrlInner;
+  if(p.scheme && SCHEME_KEY_LABEL[p.scheme]){
+    const k = SCHEME_KEY_LABEL[p.scheme];
+    ctrlInner = `<span class="key">${k.move}</span><span class="key">${k.bomb}</span>`;
+  } else if(p.type === 'cpu'){
+    ctrlInner = `CPU · waiting on Etappe 6`;
+  } else {
+    ctrlInner = `—`;
+  }
+
   card.innerHTML = `
-    <div class="row1" data-row1></div>
+    <div class="row" data-row1></div>
     <div class="hearts" data-hearts></div>
     <div class="pups" data-pups></div>
-    <div class="ctrl-mini" style="font-size:7px;color:var(--mid);margin-top:6px">${ctrlLabel}</div>
+    <div class="ctrl-row">${ctrlInner}</div>
   `;
-  const row1 = card.querySelector('[data-row1]');
-  row1.appendChild(charCanvas(p.charId));
-  const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.name || nameFor(p);
-  const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = wins > 0 ? `${wins}W` : '—';
-  row1.appendChild(nm); row1.appendChild(sc);
-  const hearts = card.querySelector('[data-hearts]');
-  for(let i = 0; i < 3; i++) hearts.appendChild(heartCanvas(false));
-  return card;
-}
 
-function nameFor(p){
-  return (CHARS[p.charId] && p.charId.toUpperCase()) || ('P' + (p.idx + 1));
+  /* Lead crown (if winning so far). */
+  if(card.classList.contains('lead')){
+    const crown = document.createElement('span');
+    crown.className = 'crown';
+    crown.appendChild(crownSvg(28));
+    card.prepend(crown);
+  }
+
+  /* Avatar + name + score. */
+  const row1 = card.querySelector('[data-row1]');
+  const face = document.createElement('span');
+  face.className = 'face-sm';
+  face.appendChild(charSvg(p.charId, { w: 54, h: 54 }));
+  const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = p.name || CHARS[p.charId]?.name || ('P' + (p.idx + 1));
+  const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = wins > 0 ? `${wins}W` : '—';
+  row1.appendChild(face); row1.appendChild(nm); row1.appendChild(sc);
+
+  /* Heart row — 3 hearts. We don't have HP yet; all start full. */
+  const hearts = card.querySelector('[data-hearts]');
+  for(let i = 0; i < 3; i++){
+    const slot = document.createElement('span');
+    slot.appendChild(heartSvg(18));
+    hearts.appendChild(slot);
+  }
+  return card;
 }
