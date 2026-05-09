@@ -193,10 +193,47 @@ function findEscape(engineView, player, fromTx, fromTy, bombs){
   return null;
 }
 
+/* Stricter than findEscape: needs at least TWO distinct safe destinations so
+   a single blocked corridor doesn't trap us.  This makes the AI refuse bomb
+   placements that would put it in a one-exit deathtrap. */
 function canEscapeAfterBomb(engineView, player, tx, ty){
   const fakeBomb = makeFakeBomb(tx, ty, player.range);
   const allBombs = [...engineView.bombs, fakeBomb];
-  return findEscape(engineView, player, tx, ty, allBombs) != null;
+  return countSafeEscapes(engineView, player, tx, ty, allBombs, 2) >= 2;
+}
+
+function countSafeEscapes(engineView, player, fromTx, fromTy, bombs, needAtLeast){
+  const visited = new Set();
+  const queue = [[fromTx, fromTy, 0]];
+  visited.add(fromTx + ',' + fromTy);
+  const speed = Math.max(player.speed, 1);
+  let found = 0;
+  while(queue.length){
+    const [x, y, dist] = queue.shift();
+    if(dist > BFS_LIMIT) continue;
+    let minTime = Infinity;
+    for(const b of bombs){
+      const fuse = b.detonating ? 0 : b.fuse;
+      const segs = computeExplosionSegments(engineView.field, b.x, b.y, b.range);
+      for(const s of segs){
+        if(s.x === x && s.y === y && fuse < minTime) minTime = fuse;
+      }
+    }
+    const arriveTime = dist / speed;
+    if(dist > 0 && (minTime === Infinity || minTime > arriveTime + SAFETY_BUFFER)){
+      found++;
+      if(found >= needAtLeast) return found;
+    }
+    for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      const nx = x + dx, ny = y + dy;
+      const key = nx + ',' + ny;
+      if(visited.has(key)) continue;
+      visited.add(key);
+      if(!isPassable(engineView, player, nx, ny)) continue;
+      queue.push([nx, ny, dist + 1]);
+    }
+  }
+  return found;
 }
 
 /* Pick the next goal by scoring every reachable candidate within the BFS
@@ -215,47 +252,77 @@ function canEscapeAfterBomb(engineView, player, tx, ty){
 function planNext(engineView, player, level, myTx, myTy){
   const canPlace = player.bombsLive < player.bombMax;
   const isMean = level === 'mean';
+  const speed = Math.max(player.speed, 1);
 
-  /* Enemy positions for blast-targeting + chase scoring. */
+  /* Enemy data for blast-targeting + chase scoring. */
   const enemies = engineView.players.filter(p => p.idx !== player.idx && p.alive);
-  const enemyTileKey = new Set(enemies.map(p => Math.floor(p.x) + ',' + Math.floor(p.y)));
+  const enemyTilePos = enemies.map(e => ({ x: Math.floor(e.x), y: Math.floor(e.y) }));
+  const enemyTileKey = new Set(enemyTilePos.map(e => e.x + ',' + e.y));
+
+  /* Bake a single bomb-segments map up front so each candidate scoring is
+     O(1) lookup instead of recomputing segments per check. */
+  const dangerByTile = new Map();   // 'x,y' -> earliest blast time
+  for(const b of engineView.bombs){
+    const fuse = b.detonating ? 0 : b.fuse;
+    const segs = computeExplosionSegments(engineView.field, b.x, b.y, b.range);
+    for(const s of segs){
+      const k = s.x + ',' + s.y;
+      const cur = dangerByTile.get(k);
+      if(cur === undefined || fuse < cur) dangerByTile.set(k, fuse);
+    }
+  }
+
+  /* Will (x,y) still be safe by the time we walk there at full speed? */
+  function arrivalSafe(x, y, dist){
+    const t = dangerByTile.get(x + ',' + y);
+    if(t === undefined) return true;            // not in any blast — safe forever
+    const arriveT = dist / speed;
+    return t > arriveT + SAFETY_BUFFER;
+  }
 
   const visited = new Set();
   const queue = [[myTx, myTy, 0]];
   visited.add(myTx + ',' + myTy);
 
-  const candidates = [];   // { type, target, plannedBomb, score }
+  const candidates = [];
 
   while(queue.length){
     const [x, y, dist] = queue.shift();
     if(dist > BFS_LIMIT) continue;
 
-    /* Pickup at this tile? */
+    const safeHere = arrivalSafe(x, y, dist);
+
+    /* PICKUP: never path to a tile that's about to explode. */
     const pu = engineView.pickups.find(pp => pp.x === x && pp.y === y);
-    if(pu && dist > 0){
+    if(pu && dist > 0 && safeHere){
       const value = PICKUP_VALUE[pu.type] ?? 30;
       if(value > 0){
         candidates.push({ type:'pickup', target:{tx:x, ty:y, dist}, plannedBomb:null, score: value - dist*4 });
       }
-      /* Negative-value pickups (curse) don't get added; we don't path to them. */
     }
 
-    /* Bomb spot at this tile?  Score by what the blast would actually hit. */
-    if(canPlace && dist >= 0 && canEscapeAfterBomb(engineView, player, x, y)){
+    /* ATTACK: count crates + enemies in blast.  Path-clear bonus: crates
+       within 4 tiles of any enemy score extra (clearing the way to them). */
+    if(canPlace && safeHere && canEscapeAfterBomb(engineView, player, x, y)){
       const segs = computeExplosionSegments(engineView.field, x, y, player.range);
-      let crates = 0, enemyHits = 0;
+      let crates = 0, cratesNearEnemy = 0, enemyHits = 0;
       for(const s of segs){
-        if(engineView.field.at(s.x, s.y) === TILE.BOX) crates++;
+        if(engineView.field.at(s.x, s.y) === TILE.BOX){
+          crates++;
+          for(const e of enemyTilePos){
+            if(Math.abs(s.x - e.x) + Math.abs(s.y - e.y) <= 4){ cratesNearEnemy++; break; }
+          }
+        }
         if(enemyTileKey.has(s.x + ',' + s.y)) enemyHits++;
       }
       if(crates > 0 || enemyHits > 0){
-        const score = crates * 22 + enemyHits * (isMean ? 205 : 180) - dist * 5;
+        const score = crates*18 + cratesNearEnemy*15 + enemyHits*(isMean?220:180) - dist*5;
         candidates.push({ type:'attack', target:{tx:x, ty:y, dist}, plannedBomb:{tx:x, ty:y}, score });
       }
     }
 
-    /* Mean CPU chase: stand next to (not on) an enemy if reachable. */
-    if(isMean && dist > 0 && dist <= 8){
+    /* CHASE (mean only): stand next to an enemy.  Filter for safety. */
+    if(isMean && dist > 0 && dist <= 8 && safeHere){
       let nearEnemy = false;
       for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
         if(enemyTileKey.has((x+dx) + ',' + (y+dy))){ nearEnemy = true; break; }
@@ -265,10 +332,10 @@ function planNext(engineView, player, level, myTx, myTy){
       }
     }
 
-    /* Tiny fallback wander score so the AI never returns null when there's
-       at least one reachable neighbour. */
-    if(dist === 1){
-      candidates.push({ type:'wander', target:{tx:x, ty:y, dist}, plannedBomb:null, score: 12 - dist });
+    /* WANDER fallback — every reachable safe tile gets a small score so
+       the AI keeps moving when no big goal is available. */
+    if(dist > 0 && safeHere){
+      candidates.push({ type:'wander', target:{tx:x, ty:y, dist}, plannedBomb:null, score: Math.max(2, 16 - dist*2) });
     }
 
     for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
@@ -281,9 +348,18 @@ function planNext(engineView, player, level, myTx, myTy){
     }
   }
 
-  if(candidates.length === 0) return { target: null, plannedBomb: null };
+  if(candidates.length === 0){
+    /* Truly trapped.  Last-resort: walk to ANY passable neighbour, even if
+       that tile is in a blast zone — better to gamble on movement than
+       freeze and definitely die. */
+    for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
+      if(isPassable(engineView, player, myTx+dx, myTy+dy)){
+        return { target: {tx: myTx+dx, ty: myTy+dy, dist: 1}, plannedBomb: null };
+      }
+    }
+    return { target: null, plannedBomb: null };
+  }
 
-  /* Pick highest score.  Stable tiebreak by type priority then distance. */
   candidates.sort((a, b) => {
     if(b.score !== a.score) return b.score - a.score;
     return (a.target.dist ?? 0) - (b.target.dist ?? 0);
