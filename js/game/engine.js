@@ -12,6 +12,7 @@ import {
   createPickup, pickRandomPickup, applyPickup,
   DROP_CHANCE, SLOW_DURATION,
   MAGNET_RADIUS, MAGNET_STEP_INTERVAL, KICK_STEP_INTERVAL,
+  BOOMERANG_FIRST_RANGE, BOOMERANG_SECOND_DELAY,
 } from './pickups.js';
 import { createCpuController } from './cpu.js';
 
@@ -122,9 +123,12 @@ export function createEngine(lobby, hooks, opts = {}){
       }
       prevBomb.set(p.idx, r.bomb);
 
+      const ghosting = elapsed < (p.ghostUntil || 0);
       const solid = new Set();
-      for(const b of bombs){
-        if(!p.passthrough.has(b.id)) solid.add(b.x + ',' + b.y);
+      if(!ghosting){
+        for(const b of bombs){
+          if(!p.passthrough.has(b.id)) solid.add(b.x + ',' + b.y);
+        }
       }
 
       /* Kick: if pressing into a bomb directly in front of us and hasKick,
@@ -182,10 +186,18 @@ export function createEngine(lobby, hooks, opts = {}){
           const tx = Math.floor(p.x);
           const ty = Math.floor(p.y);
           if(field.at(tx, ty) === TILE.FLOOR && !bombByTile.has(tx+','+ty)){
-            const range = p.hasSuper ? Math.max(field.width, field.height) : p.range;
+            const fullRange = p.hasSuper ? Math.max(field.width, field.height) : p.range;
+            /* Boomerang primes the placed bomb: first wave uses a tiny range,
+               and the engine schedules a second wave at fullRange after a
+               short delay.  Super still wins on its own bomb. */
+            const range = p.hasBoomerang ? BOOMERANG_FIRST_RANGE : fullRange;
             const bomb = createBomb({ ownerIdx: p.idx, x: tx, y: ty, range });
             if(p.hasRemote) bomb.fuse = Infinity;
             if(p.hasSuper){ bomb.super = true; p.hasSuper = false; }
+            if(p.hasBoomerang){
+              bomb.boomerang = { phase: 1, fullRange, delay: BOOMERANG_SECOND_DELAY };
+              p.hasBoomerang = false;
+            }
             bombs.push(bomb);
             bombByTile.set(tx+','+ty, bomb.id);
             p.bombsLive++;
@@ -265,7 +277,10 @@ export function createEngine(lobby, hooks, opts = {}){
       if(idx >= 0) bombs.splice(idx, 1);
       bombByTile.delete(b.x+','+b.y);
       const owner = players.find(p => p.idx === b.ownerIdx);
-      if(owner) owner.bombsLive = Math.max(0, owner.bombsLive - 1);
+      /* Boomerang phase-1 keeps the bombsLive slot occupied — the second
+         wave we spawn below releases it. */
+      const isBoomerangPhase1 = b.boomerang && b.boomerang.phase === 1;
+      if(owner && !isBoomerangPhase1) owner.bombsLive = Math.max(0, owner.bombsLive - 1);
 
       const segs = computeExplosionSegments(field, b.x, b.y, b.range);
       explosions.push({ segments: segs, ttl: EXPLOSION_TTL });
@@ -318,6 +333,20 @@ export function createEngine(lobby, hooks, opts = {}){
             pendingEvents.push({ type: 'playerKilled', idx: p.idx, by: b.ownerIdx });
           }
         }
+      }
+
+      /* Schedule the second wave AFTER segment processing — otherwise the
+         phase-2 bomb would sit in bombByTile during phase-1's center-tile
+         chain check and detonate immediately. */
+      if(isBoomerangPhase1){
+        const phase2 = createBomb({
+          ownerIdx: b.ownerIdx, x: b.x, y: b.y, range: b.boomerang.fullRange,
+        });
+        phase2.fuse = b.boomerang.delay;
+        phase2.boomerang = { phase: 2 };
+        bombs.push(phase2);
+        bombByTile.set(phase2.x+','+phase2.y, phase2.id);
+        if(owner) owner.passthrough.add(phase2.id);
       }
     }
 

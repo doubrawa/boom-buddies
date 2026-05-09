@@ -34,11 +34,11 @@ export const PUPS = {
   kick:   { nm:'Kick',        ds:'push bombs you bump',    sym:'#pu-kick',   bg:'#ffd0e0' },
   magnet: { nm:'Magnet',      ds:'pulls power-ups',        sym:'#pu-magnet', bg:'#ffd0d6' },
   curse:  { nm:'Curse',       ds:'rotten · 5s debuff',     sym:'#pu-skull',  bg:'#fff'    },
-  mend:   { nm:'Mend',        ds:'+1 heart back',          sym:'#pu-heart',  bg:'#ffd0e0' },
+  boomerang: { nm:'Boomerang', ds:'two-wave bomb',          sym:'#pu-boomerang', bg:'#ffe0c8' },
 };
 
 /* All 12 IDs in display order for the reference panel. */
-export const ALL_PUP_IDS = ['fire','bomb','speed','kick','shield','ghost','slow','magnet','remote','super','curse','mend'];
+export const ALL_PUP_IDS = ['fire','bomb','speed','kick','shield','ghost','slow','magnet','remote','super','curse','boomerang'];
 
 /* ====================================================
    Helpers — every function returns a real SVG element

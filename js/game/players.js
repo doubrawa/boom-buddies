@@ -10,6 +10,7 @@
      center of the perpendicular axis, so they don't get stuck on corners. */
 
 import { TILE } from './field.js';
+import { SLOW_FACTOR } from './pickups.js';
 
 const HALF = 0.40;          // hitbox half-extent in tiles
 /* Corner-cut: when the player is pressing one axis and gets blocked because
@@ -42,6 +43,7 @@ export function createPlayer(slot, schemeId, charId, controllerType, displayName
     /* Power-up state. */
     hasRemote:    false,
     hasSuper:     false,         // primed: next placed bomb is super
+    hasBoomerang: false,         // primed: next placed bomb fires two waves
     hasKick:      false,
     hasGlove:     false,
     hasIce:       false,
@@ -73,7 +75,7 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles, elapsed){
 
   /* Effective speed: half-speed while slowed. */
   const slowed = elapsed != null && elapsed < p.slowUntil;
-  const speed = slowed ? p.speed * 0.5 : p.speed;
+  const speed = slowed ? p.speed * SLOW_FACTOR : p.speed;
   /* While ghosted: walls and boxes don't block.  Bombs still block (you can
      glide through walls but not through your own ticking explosives). */
   const ghosting = elapsed != null && elapsed < p.ghostUntil;

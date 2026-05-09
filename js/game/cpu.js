@@ -30,7 +30,7 @@ const PICKUP_VALUE = {
   bomb:   90,   // extra carry slot — huge
   fire:   85,   // bigger blast
   shield: 95,   // free life (one-hit-kill rules)
-  mend:   95,   // also a free shield stack
+  boomerang: 75, // primes a two-wave bomb — strong but situational
   super:  80,   // nuke once
   speed:  70,
   remote: 70,

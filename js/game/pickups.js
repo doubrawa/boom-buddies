@@ -8,7 +8,7 @@ export const DROP_CHANCE = [0.15, 0.30, 0.50];
 /* All 12 power-ups now have working mechanics — drop pool covers everything. */
 export const PICKUP_POOL = [
   'bomb', 'fire', 'speed', 'remote', 'shield', 'super', 'ghost', 'slow',
-  'kick', 'magnet', 'curse', 'mend',
+  'kick', 'magnet', 'curse', 'boomerang',
 ];
 
 /* Caps so a runaway match doesn't produce comical superplayers. */
@@ -20,8 +20,8 @@ export const MAX_SPEED = 8.5;
 export const GHOST_DURATION = 5;
 /* Slow duration applied to OTHER players (seconds). */
 export const SLOW_DURATION = 3;
-/* Slow multiplier (50%). */
-export const SLOW_FACTOR = 0.5;
+/* Slow multiplier (40%). */
+export const SLOW_FACTOR = 0.4;
 /* Curse: how long does self-slow last when you pick up a skull? */
 export const CURSE_DURATION = 5;
 /* Magnet: pull pickups within this many tiles toward the holder. */
@@ -30,6 +30,10 @@ export const MAGNET_RADIUS = 4;
 export const MAGNET_STEP_INTERVAL = 0.25;
 /* Kick: how often a kicked bomb advances one tile (seconds). */
 export const KICK_STEP_INTERVAL = 0.12;
+/* Boomerang: first wave is short-range (1 tile), second wave fires after this
+   delay with the player's full bomb range. */
+export const BOOMERANG_FIRST_RANGE  = 1;
+export const BOOMERANG_SECOND_DELAY = 0.5;
 
 let nextPickupId = 1;
 
@@ -80,10 +84,10 @@ export function applyPickup(player, type, ctx){
     case 'curse':
       player.slowUntil = Math.max(player.slowUntil || 0, ctx.elapsed + CURSE_DURATION);
       break;
-    /* Mend — Heart.  With single-hit-kill rules, mend gives a free shield
-       stack (an extra life that absorbs one bomb hit). */
-    case 'mend':
-      player.shieldStacks = (player.shieldStacks || 0) + 1;
+    /* Boomerang — primes the next placed bomb to fire in two waves: a tiny
+       blast on the fuse, then a full-range blast 0.5 s later. */
+    case 'boomerang':
+      player.hasBoomerang = true;
       break;
   }
   /* Maintain a list of all collected types for the HUD display. */
