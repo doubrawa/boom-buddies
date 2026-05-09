@@ -9,6 +9,7 @@ import { createInput, CONTROL_SCHEMES } from './input.js';
 import { createPlayer, stepPlayer, tilesUnderPlayer } from './players.js';
 import { createBomb, computeExplosionSegments, playerOnTile, EXPLOSION_TTL } from './bombs.js';
 import { createPickup, pickRandomPickup, applyPickup, DROP_CHANCE, SLOW_DURATION } from './pickups.js';
+import { createCpuController } from './cpu.js';
 
 const HUMAN_SCHEMES = ['wasd', 'arrows', 'ijkl', 'numpad'];
 
@@ -20,7 +21,9 @@ export function createEngine(lobby, hooks){
   const timeLimit = lobby.timeLimit || 0;     // 0 = infinite
 
   const players = [];
+  const cpus = new Map();         // idx -> cpu controller for cpu-mode players
   let humanCount = 0;
+  let cpuCount = 0;
   activePlayers.forEach((cfg, i) => {
     const spawn = field.spawns[i] || field.spawns[0];
     const slot = { idx: i, x: spawn[0], y: spawn[1] };
@@ -30,6 +33,13 @@ export function createEngine(lobby, hooks){
       humanCount++;
     }
     players.push(createPlayer(slot, scheme, cfg.id, cfg.mode, cfg.name));
+    if(cfg.mode === 'cpu'){
+      /* First CPU per match is "nice", later ones get "mean" — keeps things
+         interesting when several CPUs are in play.  Easy to tune later. */
+      const level = cpuCount === 0 ? 'nice' : 'mean';
+      cpus.set(i, createCpuController(level));
+      cpuCount++;
+    }
   });
 
   const bombs = [];
@@ -56,6 +66,14 @@ export function createEngine(lobby, hooks){
   const kosByIdx = new Map();         // idx -> kills this round (excl. self-KOs)
   let roundEndedFired = false;
 
+  /* What CPUs see on every tick.  Live references — they read the same arrays
+     gameplay mutates each tick, so the CPU is always reasoning about the
+     current world. */
+  const cpuView = {
+    field, bombs, pickups, players,
+    get elapsed(){ return elapsed; },
+  };
+
   let rafHandle = null;
   let timeoutHandle = null;
   let lastTime = 0;
@@ -68,13 +86,28 @@ export function createEngine(lobby, hooks){
     lastTime = now;
     elapsed += dt;
 
-    /* 1. Apply input. */
+    /* 1. Apply input — humans from keyboard, CPUs from their controller. */
     for(const p of players){
       if(!p.alive){ continue; }
-      if(p.type !== 'human' || !p.scheme){ continue; }
 
-      const wasBomb = prevBomb.get(p.idx) || false;
-      const r = input.read(p.scheme, wasBomb);
+      let r;
+      if(p.type === 'human' && p.scheme){
+        const wasBomb = prevBomb.get(p.idx) || false;
+        r = input.read(p.scheme, wasBomb);
+      } else if(p.type === 'cpu'){
+        const cpu = cpus.get(p.idx);
+        if(!cpu){ continue; }
+        const action = cpu.decide(p, cpuView);
+        const wasBomb = prevBomb.get(p.idx) || false;
+        r = {
+          dx: action.dx,
+          dy: action.dy,
+          bomb: action.bomb,
+          bombEdge: action.bomb && !wasBomb,
+        };
+      } else {
+        continue;   // 'off' — never reached because we filtered, but safe
+      }
       prevBomb.set(p.idx, r.bomb);
 
       const solid = new Set();
