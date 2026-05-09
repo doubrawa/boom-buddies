@@ -12,6 +12,11 @@
 import { TILE } from './field.js';
 
 const HALF = 0.40;          // hitbox half-extent in tiles
+/* Corner-cut: when the player is pressing one axis and gets blocked because
+   their perpendicular position is slightly off-center, nudge toward the tile
+   center on that perpendicular axis.  This rate is in tiles/sec and only
+   applies during an active blocked move — never at rest. */
+const CORNER_NUDGE_RATE = 5.0;
 
 export function createPlayer(slot, schemeId, charId, controllerType, displayName){
   return {
@@ -74,12 +79,39 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles, elapsed){
 
   if(dx !== 0){
     const nx = p.x + dx * speed * dt;
-    if(canFit(field, nx, p.y, solidBombTiles, ghosting)) p.x = nx;
+    if(canFit(field, nx, p.y, solidBombTiles, ghosting)){
+      p.x = nx;
+    } else if(dy === 0){
+      /* Corner-cut on Y: if blocked moving along X with no Y input, try a
+         small nudge toward the nearest Y tile center.  Often that's all that
+         was preventing the move (one corner of the AABB clipping a wall). */
+      const cy = Math.floor(p.y) + 0.5;
+      const off = cy - p.y;
+      if(Math.abs(off) > 0.02){
+        const nudge = Math.sign(off) * Math.min(CORNER_NUDGE_RATE * dt, Math.abs(off));
+        if(canFit(field, nx, p.y + nudge, solidBombTiles, ghosting)){
+          p.y += nudge;
+          p.x = nx;
+        }
+      }
+    }
   }
 
   if(dy !== 0){
     const ny = p.y + dy * speed * dt;
-    if(canFit(field, p.x, ny, solidBombTiles, ghosting)) p.y = ny;
+    if(canFit(field, p.x, ny, solidBombTiles, ghosting)){
+      p.y = ny;
+    } else if(dx === 0){
+      const cx = Math.floor(p.x) + 0.5;
+      const off = cx - p.x;
+      if(Math.abs(off) > 0.02){
+        const nudge = Math.sign(off) * Math.min(CORNER_NUDGE_RATE * dt, Math.abs(off));
+        if(canFit(field, p.x + nudge, ny, solidBombTiles, ghosting)){
+          p.x += nudge;
+          p.y = ny;
+        }
+      }
+    }
   }
 }
 

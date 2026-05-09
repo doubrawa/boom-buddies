@@ -413,7 +413,11 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
    4) ROUND END
    ================================================= */
 .we{
-  height:920px;position:relative;text-align:center;
+  /* min-height so 8-player scoreboard rows can extend the container instead of
+     hiding the action buttons.  overflow stays hidden to confine confetti. */
+  min-height:920px;
+  padding-bottom:32px;
+  position:relative;text-align:center;
   background:
     radial-gradient(ellipse 60% 50% at 50% 30%, #ffe1ee 0%, transparent 70%),
     linear-gradient(180deg, #ffd6e8 0%, #f3d6ee 60%, #d6e8ff 100%);
