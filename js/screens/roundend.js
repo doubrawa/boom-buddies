@@ -1,5 +1,16 @@
 import { charSvg, crownSvg, icoSvg, pupSvg, PUPS, CHARS } from '../sprites.js';
 import { rankings, isMatchOver, matchChampion } from '../game/match.js';
+import { MSG_NEXTROUND, MSG_MATCHEND, encodeMatch, decodeMatch } from '../net/protocol.js';
+
+let clientConn = null;
+function safeParse(s){ try { return JSON.parse(s); } catch { return null; } }
+
+export function teardown(){
+  if(clientConn){
+    try { clientConn.removeAllListeners?.('data'); } catch {}
+    clientConn = null;
+  }
+}
 
 const PLACE_GLYPH = ['','🥇','🥈','🥉'];
 
@@ -52,12 +63,13 @@ export function render(ctx){
           <span class="ic" data-spr="ico-back"></span>
           Back to Menu
         </button>
-        ${matchOver ? '' : `
-        <button class="pillbtn primary" data-action="next">
-          <span class="ic" data-spr="ico-play"></span>
-          Next Round
-          <span class="arr">›</span>
-        </button>`}
+        ${matchOver ? '' : (ctx.net?.role === 'client'
+          ? `<div style="font-family:'Fredoka';font-weight:600;font-size:16px;color:var(--ink2);padding:18px 26px;background:#fff;border:3px solid var(--ink);border-radius:999px;box-shadow:0 4px 0 var(--ink)">Waiting for host…</div>`
+          : `<button class="pillbtn primary" data-action="next">
+              <span class="ic" data-spr="ico-play"></span>
+              Next Round
+              <span class="arr">›</span>
+            </button>`)}
       </div>
     </div>
   `;
@@ -97,9 +109,37 @@ export function render(ctx){
     }
   }
 
-  section.querySelector('[data-action="menu"]').addEventListener('click', () => navigate('title'));
+  /* Clients listen for host's next-round / match-end signals. */
+  if(ctx.net?.role === 'client'){
+    clientConn = ctx.net.client.conn;
+    try { clientConn.removeAllListeners?.('data'); } catch {}
+    clientConn.on?.('data', (raw) => {
+      const m = typeof raw === 'string' ? safeParse(raw) : raw;
+      if(!m) return;
+      if(m.t === MSG_NEXTROUND){ teardown(); ctx.navigate('game'); }
+      else if(m.t === MSG_MATCHEND){
+        if(m.match) ctx.match = decodeMatch(m.match);
+        /* Force the screen to re-render so the match-complete branch shows. */
+        teardown(); ctx.navigate('roundend');
+      }
+    });
+  }
+
+  section.querySelector('[data-action="menu"]').addEventListener('click', () => {
+    /* Host that walks home should tell its clients the match is over. */
+    if(ctx.net?.role === 'host'){
+      try { ctx.net.host.broadcast({ t: MSG_MATCHEND, match: encodeMatch(match) }); } catch {}
+    }
+    navigate('title');
+  });
   const nextBtn = section.querySelector('[data-action="next"]');
-  if(nextBtn) nextBtn.addEventListener('click', () => navigate('game'));
+  if(nextBtn) nextBtn.addEventListener('click', () => {
+    /* Host signals every guest to start the next round. */
+    if(ctx.net?.role === 'host'){
+      try { ctx.net.host.broadcast({ t: MSG_NEXTROUND }); } catch {}
+    }
+    navigate('game');
+  });
 }
 
 function buildPodium(host, top3){

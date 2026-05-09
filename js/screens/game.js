@@ -8,8 +8,8 @@ import { TILE } from '../game/field.js';
 import { SCHEME_LABEL, createInput } from '../game/input.js';
 import { HOT_THRESHOLD } from '../game/bombs.js';
 import {
-  MSG_INPUT, MSG_STATE, MSG_FIELD, MSG_EVENTS, MSG_ROUNDEND,
-  encodeState, encodeField,
+  MSG_INPUT, MSG_STATE, MSG_FIELD, MSG_EVENTS, MSG_ROUNDEND, MSG_NEXTROUND, MSG_MATCHEND,
+  encodeState, encodeField, encodeMatch, decodeMatch,
 } from '../net/protocol.js';
 import {
   sfxBombPlace, sfxExplosion, sfxPickup, sfxDeath, sfxShield, sfxRoundEnd,
@@ -72,12 +72,7 @@ function renderHostOrLocal(ctx){
       renderExplosions(view, engine.explosions);
       renderPickups(view, engine.pickups);
     },
-    onRoundEnd: (result) => {
-      if(isHost){
-        ctx.net.host.broadcast({ t: MSG_ROUNDEND, result: serializeResult(result) });
-      }
-      scheduleRoundEnd(ctx, result);
-    },
+    onRoundEnd: (result) => scheduleRoundEnd(ctx, result, isHost),
   }, {
     remoteInputProvider: (idx) => remoteInputs.get(idx) || { dx:0, dy:0, bomb:false },
   });
@@ -107,8 +102,7 @@ function renderHostOrLocal(ctx){
   section.querySelector('[data-action="end-round"]').addEventListener('click', () => {
     if(endTransitionHandle != null) return;
     const result = { winnerIdx: null, durationSec: engine ? engine.elapsed : 0, kos: new Map(), reason: 'forfeit' };
-    if(isHost) ctx.net.host.broadcast({ t: MSG_ROUNDEND, result: serializeResult(result) });
-    scheduleRoundEnd(ctx, result);
+    scheduleRoundEnd(ctx, result, isHost);
   });
 
   /* Host network setup: broadcast field once, then state every interval, and
@@ -136,6 +130,7 @@ function renderHostOrLocal(ctx){
     }, SNAPSHOT_INTERVAL_MS);
     netHandles = { broadcastInterval };
   }
+  /* For local mode netHandles stays null. */
 
   engine.start();
 }
@@ -184,13 +179,22 @@ function gameShell(match, initialSecs){
   `;
 }
 
-function scheduleRoundEnd(ctx, result){
+function scheduleRoundEnd(ctx, result, isHost){
   if(endTransitionHandle != null) return;
   stopTimer();
   if(result.winnerIdx != null) sfxRoundEnd();
   endTransitionHandle = setTimeout(() => {
     endTransitionHandle = null;
     ctx.recordRound(result);
+    /* Host broadcasts the post-update match state so clients land on roundend
+       with the correct cumulative scores. */
+    if(isHost && ctx.net?.host){
+      ctx.net.host.broadcast({
+        t: MSG_ROUNDEND,
+        result: serializeResult(result),
+        match: encodeMatch(ctx.match),
+      });
+    }
     ctx.navigate('roundend');
   }, ROUND_END_DELAY_MS);
 }
@@ -203,6 +207,8 @@ export function teardown(){
     if(netHandles.broadcastInterval) clearInterval(netHandles.broadcastInterval);
     if(netHandles.sendInterval) clearInterval(netHandles.sendInterval);
     if(netHandles.input) netHandles.input.teardown?.();
+    /* Drop the data handler — roundend / lobby will install their own. */
+    if(netHandles.conn) netHandles.conn.removeAllListeners?.('data');
     netHandles = null;
   }
 }
@@ -265,7 +271,7 @@ function renderClient(ctx){
     }, 250);
   }
 
-  netHandles = { sendInterval, input };
+  netHandles = { sendInterval, input, conn: ctx.net.client.conn };
 }
 
 function handleClientNetMsg(m, ctx, view, remote, boardEl, section){
@@ -297,9 +303,16 @@ function handleClientNetMsg(m, ctx, view, remote, boardEl, section){
       kos: new Map(m.result.kos || []),
       reason: m.result.reason,
     };
-    /* For the client, just navigate to the title at round-end since match
-       state is host-side only.  v2 will sync match scoring. */
-    setTimeout(() => ctx.navigate('title'), ROUND_END_DELAY_MS);
+    /* Set match + lastRound from the host so roundend can render the same
+       scoreboard the host sees. */
+    if(m.match) ctx.match = decodeMatch(m.match);
+    ctx.lastRound = result;
+    setTimeout(() => ctx.navigate('roundend'), ROUND_END_DELAY_MS);
+  } else if(m.t === MSG_NEXTROUND){
+    ctx.navigate('game');
+  } else if(m.t === MSG_MATCHEND){
+    if(m.match) ctx.match = decodeMatch(m.match);
+    ctx.navigate('roundend');   /* shows match-complete branch */
   }
 }
 

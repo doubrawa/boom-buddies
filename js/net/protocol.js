@@ -16,12 +16,53 @@ export const MSG_FIELD    = 'field';     // { width, height, tiles: [int...] }  
 export const MSG_STATE    = 'state';     // per-tick player/bomb/pickup snapshot
 export const MSG_EVENTS   = 'events';    // batch of game events (boxBroken, pickupTaken, etc.)
 export const MSG_ROUNDEND = 'roundend';  // { result, match }
+export const MSG_NEXTROUND = 'nextround'; // host signals start of next round
+export const MSG_MATCHEND = 'matchend';  // { match }   — match is fully over
 export const MSG_KICK     = 'kick';      // { reason }   — host kicks a client
 
 /* Helpers — JSON.stringify/parse today, easy to upgrade later. */
 export function encode(msg){ return JSON.stringify(msg); }
 export function decode(raw){
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+/* Match state for clients.  Maps become arrays of [k,v] pairs because JSON
+   doesn't keep them. */
+export function encodeMatch(match){
+  return {
+    rounds: match.rounds,
+    current: match.current,
+    timeLimit: match.timeLimit,
+    fieldSize: match.fieldSize,
+    goodieFreq: match.goodieFreq,
+    players: match.players.map(p => ({
+      idx: p.idx, id: p.id, name: p.name, mode: p.mode,
+      score: p.score, ko: p.ko,
+    })),
+    history: match.history.map(h => ({
+      winnerIdx: h.winnerIdx,
+      durationSec: h.durationSec,
+      kos: h.kos ? Array.from(h.kos.entries()) : [],
+      reason: h.reason,
+    })),
+  };
+}
+
+export function decodeMatch(raw){
+  return {
+    rounds: raw.rounds,
+    current: raw.current,
+    timeLimit: raw.timeLimit,
+    fieldSize: raw.fieldSize,
+    goodieFreq: raw.goodieFreq,
+    players: raw.players.map(p => ({ ...p })),
+    history: (raw.history || []).map(h => ({
+      winnerIdx: h.winnerIdx,
+      durationSec: h.durationSec,
+      kos: new Map(h.kos || []),
+      reason: h.reason,
+    })),
+  };
 }
 
 /* Compact field encoding: tiles to a flat number array. */
