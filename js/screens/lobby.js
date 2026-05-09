@@ -150,7 +150,6 @@ function buildFields(host, state){
     card.dataset.id = f.id;
     card.innerHTML = `
       <div class="head"><span class="name">${f.label}</span><span class="dim">${f.w} × ${f.h}</span></div>
-      <div class="preview">${miniPreviewSvg(f.w, f.h)}</div>
       <div class="meta"><span>${f.meta[0]}</span><span>${f.meta[1]}</span></div>
       <span class="badge-sel">SELECTED</span>
     `;
@@ -161,37 +160,6 @@ function buildFields(host, state){
     });
     host.appendChild(card);
   }
-}
-
-/* Lightweight inline SVG preview of a field — pillars, a few crates,
-   and chibi dots in the corners. */
-function miniPreviewSvg(w, h){
-  const TS = 10;
-  const W = w * TS, H = h * TS;
-  let pillars = '';
-  for(let y = 0; y < h; y++){
-    for(let x = 0; x < w; x++){
-      const isBorder = x === 0 || y === 0 || x === w-1 || y === h-1;
-      const isPillar = x % 2 === 0 && y % 2 === 0;
-      if(isBorder || isPillar) pillars += `<rect x="${x*TS}" y="${y*TS}" width="${TS}" height="${TS}" fill="#9c8db8" stroke="#5b4d7a" stroke-width=".8"/>`;
-    }
-  }
-  /* Pseudo-random crate sprinkle. */
-  let crates = '';
-  for(let y = 1; y < h-1; y++){
-    for(let x = 1; x < w-1; x++){
-      if(x % 2 === 0 && y % 2 === 0) continue;
-      if(((x*7 + y*3) % 5) >= 3) crates += `<rect x="${x*TS+1}" y="${y*TS+1}" width="${TS-2}" height="${TS-2}" rx="2" fill="#ffae6a" stroke="#2b2150" stroke-width=".6"/>`;
-    }
-  }
-  const r = TS * 0.6;
-  const corners = `
-    <circle cx="${TS*1.5}" cy="${TS*1.5}" r="${r}" fill="#ff9dbf" stroke="#2b2150" stroke-width=".8"/>
-    <circle cx="${(w-1.5)*TS}" cy="${TS*1.5}" r="${r}" fill="#a9d8ff" stroke="#2b2150" stroke-width=".8"/>
-    <circle cx="${TS*1.5}" cy="${(h-1.5)*TS}" r="${r}" fill="#ffd76b" stroke="#2b2150" stroke-width=".8"/>
-    <circle cx="${(w-1.5)*TS}" cy="${(h-1.5)*TS}" r="${r}" fill="#c5a8ed" stroke="#2b2150" stroke-width=".8"/>
-  `;
-  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><rect width="${W}" height="${H}" fill="#dff0d6"/>${pillars}${crates}${corners}</svg>`;
 }
 
 function buildSlots(host, state){
