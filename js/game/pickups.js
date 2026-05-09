@@ -5,10 +5,10 @@
 /* Drop probabilities for the lobby slider's three positions. */
 export const DROP_CHANCE = [0.15, 0.30, 0.50];
 
-/* Power-ups we ACTUALLY apply this etappe.  The other 4 (kick / glove / ice /
-   magnet) ship visually as sprites but are not in the random drop pool yet. */
+/* All 12 power-ups now have working mechanics — drop pool covers everything. */
 export const PICKUP_POOL = [
   'bomb', 'fire', 'speed', 'remote', 'shield', 'super', 'ghost', 'slow',
+  'kick', 'magnet', 'curse', 'mend',
 ];
 
 /* Caps so a runaway match doesn't produce comical superplayers. */
@@ -22,6 +22,14 @@ export const GHOST_DURATION = 5;
 export const SLOW_DURATION = 3;
 /* Slow multiplier (50%). */
 export const SLOW_FACTOR = 0.5;
+/* Curse: how long does self-slow last when you pick up a skull? */
+export const CURSE_DURATION = 5;
+/* Magnet: pull pickups within this many tiles toward the holder. */
+export const MAGNET_RADIUS = 4;
+/* How often a magnet drags each pickup one tile closer (seconds). */
+export const MAGNET_STEP_INTERVAL = 0.25;
+/* Kick: how often a kicked bomb advances one tile (seconds). */
+export const KICK_STEP_INTERVAL = 0.12;
 
 let nextPickupId = 1;
 
@@ -62,19 +70,19 @@ export function applyPickup(player, type, ctx){
     case 'slow':
       ctx.slowOthers(player, SLOW_DURATION);
       break;
-    /* The remaining 4 are dropped as sprites but no effect yet — they'll
-       still register in player.collected for HUD display. */
     case 'kick':
       player.hasKick = true;
       break;
-    case 'glove':
-      player.hasGlove = true;
-      break;
-    case 'ice':
-      player.hasIce = true;
-      break;
     case 'magnet':
       player.hasMagnet = true;
+      break;
+    /* Curse — Skull, the rotten one.  Slows the player who picks it up. */
+    case 'curse':
+      player.slowUntil = Math.max(player.slowUntil || 0, ctx.elapsed + CURSE_DURATION);
+      break;
+    /* Mend — Heart.  +1 shield stack (effectively a free extra life). */
+    case 'mend':
+      player.shieldStacks = (player.shieldStacks || 0) + 1;
       break;
   }
   /* Maintain a list of all collected types for the HUD display. */

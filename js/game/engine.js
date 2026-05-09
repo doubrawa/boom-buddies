@@ -8,7 +8,11 @@ import { createField, FIELD_PRESETS, TILE } from './field.js';
 import { createInput, CONTROL_SCHEMES } from './input.js';
 import { createPlayer, stepPlayer, tilesUnderPlayer } from './players.js';
 import { createBomb, computeExplosionSegments, playerOnTile, EXPLOSION_TTL } from './bombs.js';
-import { createPickup, pickRandomPickup, applyPickup, DROP_CHANCE, SLOW_DURATION } from './pickups.js';
+import {
+  createPickup, pickRandomPickup, applyPickup,
+  DROP_CHANCE, SLOW_DURATION,
+  MAGNET_RADIUS, MAGNET_STEP_INTERVAL, KICK_STEP_INTERVAL,
+} from './pickups.js';
 import { createCpuController } from './cpu.js';
 
 const HUMAN_SCHEMES = ['wasd', 'arrows', 'ijkl', 'numpad'];
@@ -114,6 +118,30 @@ export function createEngine(lobby, hooks){
       for(const b of bombs){
         if(!p.passthrough.has(b.id)) solid.add(b.x + ',' + b.y);
       }
+
+      /* Kick: if pressing into a bomb directly in front of us and hasKick,
+         start the bomb sliding in our move direction.  We still don't move
+         (the bomb still blocks us) — classic Bomberman foot-tap behaviour. */
+      if(p.hasKick && (r.dx !== 0 || r.dy !== 0)){
+        const dirX = Math.abs(r.dx) >= Math.abs(r.dy) ? Math.sign(r.dx) : 0;
+        const dirY = dirX === 0 ? Math.sign(r.dy) : 0;
+        if(dirX !== 0 || dirY !== 0){
+          const myTx = Math.floor(p.x), myTy = Math.floor(p.y);
+          const targetX = myTx + dirX, targetY = myTy + dirY;
+          const bombId = bombByTile.get(targetX + ',' + targetY);
+          if(bombId != null){
+            const target = bombs.find(b => b.id === bombId);
+            if(target && !target.kickDir){
+              target.kickDir = { dx: dirX, dy: dirY };
+              target.kickNextStep = elapsed + KICK_STEP_INTERVAL;
+              /* The kicker no longer passes through it — they kicked it,
+                 they can't follow into the same tile. */
+              p.passthrough.delete(target.id);
+            }
+          }
+        }
+      }
+
       stepPlayer(p, r.dx, r.dy, dt, field, solid, elapsed);
 
       if(p.passthrough.size > 0){
@@ -167,7 +195,54 @@ export function createEngine(lobby, hooks){
       }
     }
 
-    /* 2. Tick fuses. */
+    /* 2a. Step kicked bombs — one tile per KICK_STEP_INTERVAL until they hit
+       an obstacle (wall, box, another bomb, or a player). */
+    for(const b of bombs){
+      if(!b.kickDir) continue;
+      if(elapsed < (b.kickNextStep || 0)) continue;
+      const nx = b.x + b.kickDir.dx, ny = b.y + b.kickDir.dy;
+      let blocked = field.at(nx, ny) !== TILE.FLOOR;
+      if(!blocked && bombByTile.has(nx + ',' + ny)) blocked = true;
+      if(!blocked){
+        for(const other of players){
+          if(!other.alive) continue;
+          if(playerOnTile(other, nx, ny)){ blocked = true; break; }
+        }
+      }
+      if(blocked){
+        b.kickDir = null;
+        b.kickNextStep = 0;
+      } else {
+        bombByTile.delete(b.x + ',' + b.y);
+        b.x = nx; b.y = ny;
+        bombByTile.set(b.x + ',' + b.y, b.id);
+        b.kickNextStep = elapsed + KICK_STEP_INTERVAL;
+      }
+    }
+
+    /* 2b. Magnet pull — players with hasMagnet drag nearby pickups one tile
+       closer along the dominant axis at MAGNET_STEP_INTERVAL cadence. */
+    for(const holder of players){
+      if(!holder.alive || !holder.hasMagnet) continue;
+      const hx = Math.floor(holder.x), hy = Math.floor(holder.y);
+      for(const pu of pickups){
+        const dx = hx - pu.x, dy = hy - pu.y;
+        const manhattan = Math.abs(dx) + Math.abs(dy);
+        if(manhattan === 0 || manhattan > MAGNET_RADIUS) continue;
+        if(elapsed < (pu.nextMagnetStep || 0)) continue;
+        const stepX = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
+        const stepY = stepX === 0 ? Math.sign(dy) : 0;
+        const nx = pu.x + stepX, ny = pu.y + stepY;
+        if(field.at(nx, ny) !== TILE.FLOOR) continue;
+        if(pickupByTile.has(nx + ',' + ny)) continue;
+        pickupByTile.delete(pu.x + ',' + pu.y);
+        pu.x = nx; pu.y = ny;
+        pickupByTile.set(pu.x + ',' + pu.y, pu.id);
+        pu.nextMagnetStep = elapsed + MAGNET_STEP_INTERVAL;
+      }
+    }
+
+    /* 3. Tick fuses. */
     for(const b of bombs){
       if(b.detonating) continue;
       b.fuse -= dt;

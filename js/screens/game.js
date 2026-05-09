@@ -219,6 +219,10 @@ function renderBombs(view, bombs){
     let entry = view.bombSprites.get(b.id);
     if(!entry){
       const wrap = makePosWrapper();
+      /* Smooth tile-to-tile slide when the engine teleports the bomb during
+         a kick.  No animation if it just sits — it never gets a different
+         tile from one render to the next. */
+      wrap.style.transition = 'transform 0.12s linear';
       const inner = makeSpriteHolder(BOMB_SIZE);
       inner.classList.add('breathe');
       inner.appendChild(bombSvg(false, BOMB_SIZE));
@@ -286,6 +290,8 @@ function renderPickups(view, pickups){
     let entry = view.pickupSprites.get(pk.id);
     if(!entry){
       const wrap = makePosWrapper();
+      /* Smooth slide when a magnet drags the pickup across tiles. */
+      wrap.style.transition = `transform 0.22s ease-out`;
       const inner = makeSpriteHolder(PICKUP_SIZE);
       inner.classList.add('pulse-slow');
       const meta = PUPS[pk.type] || PUPS.bomb;
@@ -294,11 +300,12 @@ function renderPickups(view, pickups){
       chip.appendChild(pupSvg(pk.type, PICKUP_SIZE - 14));
       inner.appendChild(chip);
       wrap.appendChild(inner);
-      wrap.style.transform = `translate(${((pk.x + 0.5) * TS).toFixed(2)}px, ${((pk.y + 0.5) * TS).toFixed(2)}px)`;
       view.pickupLayer.appendChild(wrap);
       entry = { wrap };
       view.pickupSprites.set(pk.id, entry);
     }
+    /* Always sync transform — magnet may have moved the pickup. */
+    entry.wrap.style.transform = `translate(${((pk.x + 0.5) * TS).toFixed(2)}px, ${((pk.y + 0.5) * TS).toFixed(2)}px)`;
   }
   for(const [id, entry] of view.pickupSprites){
     if(!seen.has(id)){ entry.wrap.remove(); view.pickupSprites.delete(id); }
