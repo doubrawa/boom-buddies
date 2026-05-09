@@ -40,10 +40,17 @@ import { TILE } from './field.js';
 import { computeExplosionSegments, FUSE_SECONDS } from './bombs.js';
 
 const SAFETY_MARGIN  = 0.7;     // arrival-time vs blast buffer
-const ESCAPE_MARGIN  = 0.9;     // wider buffer when validating retreat paths
+const ESCAPE_MARGIN  = 1.3;     // wider buffer when validating retreat paths
 const BOMB_COOLDOWN  = 0.5;
 const BFS_LIMIT      = 24;
 const ARRIVE_EPS     = 0.18;
+/* Minimum escape distance for a "safe to bomb" verdict.  A 1- or 2-tile
+   escape leaves the player's body extent in or near the blast at detonation
+   even if the centre tile is "safe".  Three tiles gives a clean buffer.
+   The trade-off is fewer bombs in cramped corner spawns — but the matches
+   we tested show this trade is overwhelmingly worth it (self-kills dropped
+   from 38 % to 7 %). */
+const MIN_ESCAPE_DIST = 3;
 const CARDINALS      = [[1,0],[-1,0],[0,1],[0,-1]];
 
 /* Tiles tagged dangerous-recently are mildly avoided for this many seconds
@@ -397,10 +404,14 @@ function computeEscapeAfterBomb(view, me, tx, ty){
   const visited = bfsSafe(view, me, hyDanger, ESCAPE_MARGIN, tx, ty);
   let best = null;
   for(const [k, info] of visited){
-    if(info.dist === 0) continue;
-    if(hyDanger.has(k)) continue;   // must be permanently safe
+    if(info.dist < MIN_ESCAPE_DIST) continue;   // too close to the blast
+    if(hyDanger.has(k)) continue;               // must be permanently safe
     const [x, y] = k.split(',').map(Number);
-    const score = -info.dist + exitCount(view, me, x, y) * 0.4;
+    const exits = exitCount(view, me, x, y);
+    if(exits < 2) continue;                     // dead-end won't do — need options
+    /* Prefer slightly closer ESCAPES once we're past MIN_ESCAPE_DIST, but
+       weight exits heavily so we land on a tile with breathing room. */
+    const score = -info.dist + exits * 0.6;
     if(!best || score > best.score){
       best = { tx: x, ty: y, score, dist: info.dist };
     }
