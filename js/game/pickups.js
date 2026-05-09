@@ -80,9 +80,10 @@ export function applyPickup(player, type, ctx){
     case 'curse':
       player.slowUntil = Math.max(player.slowUntil || 0, ctx.elapsed + CURSE_DURATION);
       break;
-    /* Mend — Heart.  Restores one heart (does not exceed maxHp). */
+    /* Mend — Heart.  With single-hit-kill rules, mend gives a free shield
+       stack (an extra life that absorbs one bomb hit). */
     case 'mend':
-      player.hp = Math.min(player.maxHp || 3, (player.hp || 0) + 1);
+      player.shieldStacks = (player.shieldStacks || 0) + 1;
       break;
   }
   /* Maintain a list of all collected types for the HUD display. */

@@ -86,7 +86,6 @@ export function encodeState(engine){
       x: +p.x.toFixed(3),
       y: +p.y.toFixed(3),
       a: p.alive ? 1 : 0,
-      hp: p.hp ?? 3,
       g: e < (p.ghostUntil || 0) ? 1 : 0,
       s: e < (p.slowUntil || 0) ? 1 : 0,
       sh: (p.shieldStacks || 0) > 0 ? 1 : 0,

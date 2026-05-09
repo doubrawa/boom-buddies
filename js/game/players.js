@@ -37,9 +37,6 @@ export function createPlayer(slot, schemeId, charId, controllerType, displayName
     bombMax: 1,
     bombsLive: 0,
     range: 2,
-    hp: 3,
-    maxHp: 3,
-    invulnerableUntil: 0,        // engine-elapsed seconds; while > elapsed, immune to bomb damage
     /* Bombs the player overlaps and may step off of. */
     passthrough: new Set(),
     /* Power-up state. */

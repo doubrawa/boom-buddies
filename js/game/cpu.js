@@ -19,9 +19,27 @@ import { computeExplosionSegments, FUSE_SECONDS } from './bombs.js';
 
 const REPLAN_INTERVAL = 0.4;        // seconds between full goal re-plans
 const ARRIVE_EPSILON  = 0.18;       // tiles — close enough to be "on" a tile center
-const SAFETY_BUFFER   = 1.0;        // seconds of slack before nearby boom — own-bombs are lethal so we want margin
-const BFS_LIMIT       = 12;
+const SAFETY_BUFFER   = 1.2;        // seconds of slack before any nearby blast — single-hit-kill so margin matters
+const BFS_LIMIT       = 14;
 const BOMB_COOLDOWN_S = 0.6;
+
+/* Pickup priority weights (per type).  Higher = more eager to grab.
+   Curse is negative — actively avoided.  These values are blended with
+   distance: score = priority - dist * 4. */
+const PICKUP_VALUE = {
+  bomb:   90,   // extra carry slot — huge
+  fire:   85,   // bigger blast
+  shield: 95,   // free life (one-hit-kill rules)
+  mend:   95,   // also a free shield stack
+  super:  80,   // nuke once
+  speed:  70,
+  remote: 70,
+  ghost:  60,
+  kick:   55,
+  magnet: 45,
+  slow:   40,
+  curse: -200,  // run away
+};
 
 export function createCpuController(level = 'nice'){
   let target = null;          // {tx, ty} we're walking toward
@@ -181,58 +199,77 @@ function canEscapeAfterBomb(engineView, player, tx, ty){
   return findEscape(engineView, player, tx, ty, allBombs) != null;
 }
 
-/* Pick the next goal.  Order:
-     - Nearest visible pickup   → walk there
-     - Nearest tile adjacent to a crate, with a safe bomb spot → walk + plan bomb
-     - "Mean" CPU: nearest enemy player tile if within 6 BFS hops → walk close
-     - Random adjacent step (wander) */
+/* Pick the next goal by scoring every reachable candidate within the BFS
+   horizon and returning the highest score.  Scoring rules:
+
+     pickup at (x,y)          :  PICKUP_VALUE[type] - dist*4
+     bomb spot at (x,y)       :  cratesInBlast*22 + enemiesInBlast*180 - dist*5
+                                 (mean CPU: +25 per enemy in blast on top)
+     chase enemy (mean only)  :  120 - dist*8     (encourages closing distance
+                                                   even with no immediate bomb)
+     wander                   :  12 - dist        (a low-score fallback so we
+                                                   never freeze)
+
+   Curse pickups end up with negative scores; they're filtered before
+   selection so the CPU never targets a debuff. */
 function planNext(engineView, player, level, myTx, myTy){
+  const canPlace = player.bombsLive < player.bombMax;
+  const isMean = level === 'mean';
+
+  /* Enemy positions for blast-targeting + chase scoring. */
+  const enemies = engineView.players.filter(p => p.idx !== player.idx && p.alive);
+  const enemyTileKey = new Set(enemies.map(p => Math.floor(p.x) + ',' + Math.floor(p.y)));
+
   const visited = new Set();
   const queue = [[myTx, myTy, 0]];
   visited.add(myTx + ',' + myTy);
 
-  /* If we already have a bomb out, don't bother planning attack runs — we
-     can't place anyway, and walking into a "good attack tile" mid-fuse just
-     thrashes the path. */
-  const canPlace = player.bombsLive < player.bombMax;
-
-  let bestPickup = null;
-  let bestAttack = null;
-  let bestEnemy = null;
-  let firstFreeNeighbour = null;
-
-  /* Index enemies by tile for cheap lookup. */
-  const enemyTiles = new Set();
-  if(level === 'mean'){
-    for(const op of engineView.players){
-      if(op.idx === player.idx || !op.alive) continue;
-      enemyTiles.add(Math.floor(op.x) + ',' + Math.floor(op.y));
-    }
-  }
+  const candidates = [];   // { type, target, plannedBomb, score }
 
   while(queue.length){
     const [x, y, dist] = queue.shift();
     if(dist > BFS_LIMIT) continue;
 
-    const pickup = engineView.pickups.find(p => p.x === x && p.y === y);
-    if(pickup && !bestPickup) bestPickup = { tx: x, ty: y, dist };
-
-    if(level === 'mean' && enemyTiles.has(x + ',' + y) && dist > 0 && !bestEnemy){
-      bestEnemy = { tx: x, ty: y, dist };
+    /* Pickup at this tile? */
+    const pu = engineView.pickups.find(pp => pp.x === x && pp.y === y);
+    if(pu && dist > 0){
+      const value = PICKUP_VALUE[pu.type] ?? 30;
+      if(value > 0){
+        candidates.push({ type:'pickup', target:{tx:x, ty:y, dist}, plannedBomb:null, score: value - dist*4 });
+      }
+      /* Negative-value pickups (curse) don't get added; we don't path to them. */
     }
 
-    /* Crate-adjacent? Only count if we can actually drop a bomb AND survive it. */
-    if(canPlace && !bestAttack && dist > 0){
-      let hasCrate = false;
+    /* Bomb spot at this tile?  Score by what the blast would actually hit. */
+    if(canPlace && dist >= 0 && canEscapeAfterBomb(engineView, player, x, y)){
+      const segs = computeExplosionSegments(engineView.field, x, y, player.range);
+      let crates = 0, enemyHits = 0;
+      for(const s of segs){
+        if(engineView.field.at(s.x, s.y) === TILE.BOX) crates++;
+        if(enemyTileKey.has(s.x + ',' + s.y)) enemyHits++;
+      }
+      if(crates > 0 || enemyHits > 0){
+        const score = crates * 22 + enemyHits * (isMean ? 205 : 180) - dist * 5;
+        candidates.push({ type:'attack', target:{tx:x, ty:y, dist}, plannedBomb:{tx:x, ty:y}, score });
+      }
+    }
+
+    /* Mean CPU chase: stand next to (not on) an enemy if reachable. */
+    if(isMean && dist > 0 && dist <= 8){
+      let nearEnemy = false;
       for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
-        if(engineView.field.at(x + dx, y + dy) === TILE.BOX){ hasCrate = true; break; }
+        if(enemyTileKey.has((x+dx) + ',' + (y+dy))){ nearEnemy = true; break; }
       }
-      if(hasCrate && canEscapeAfterBomb(engineView, player, x, y)){
-        bestAttack = { tx: x, ty: y, dist };
+      if(nearEnemy){
+        candidates.push({ type:'chase', target:{tx:x, ty:y, dist}, plannedBomb:null, score: 120 - dist*8 });
       }
     }
 
-    if(!firstFreeNeighbour && dist === 1) firstFreeNeighbour = { tx: x, ty: y };
+    /* Tiny fallback wander score so the AI never returns null when there's
+       at least one reachable neighbour. */
+    if(dist === 1){
+      candidates.push({ type:'wander', target:{tx:x, ty:y, dist}, plannedBomb:null, score: 12 - dist });
+    }
 
     for(const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]){
       const nx = x + dx, ny = y + dy;
@@ -244,16 +281,13 @@ function planNext(engineView, player, level, myTx, myTy){
     }
   }
 
-  /* Closer of pickup vs enemy beats attack; otherwise attack. */
-  const pickupDist = bestPickup?.dist ?? Infinity;
-  const enemyDist  = bestEnemy?.dist ?? Infinity;
-  if(pickupDist <= 4 && pickupDist <= enemyDist) return { target: bestPickup, plannedBomb: null };
-  if(bestEnemy && enemyDist < 6) return { target: bestEnemy, plannedBomb: null };
-  if(bestPickup) return { target: bestPickup, plannedBomb: null };
-  if(bestAttack) return { target: bestAttack, plannedBomb: { tx: bestAttack.tx, ty: bestAttack.ty } };
-  /* When we can't bomb and there's nothing else to do, stay put — beats
-     wandering through someone else's blast radius. */
-  if(!canPlace) return { target: null, plannedBomb: null };
-  if(firstFreeNeighbour) return { target: firstFreeNeighbour, plannedBomb: null };
-  return { target: null, plannedBomb: null };
+  if(candidates.length === 0) return { target: null, plannedBomb: null };
+
+  /* Pick highest score.  Stable tiebreak by type priority then distance. */
+  candidates.sort((a, b) => {
+    if(b.score !== a.score) return b.score - a.score;
+    return (a.target.dist ?? 0) - (b.target.dist ?? 0);
+  });
+  const best = candidates[0];
+  return { target: best.target, plannedBomb: best.plannedBomb };
 }
