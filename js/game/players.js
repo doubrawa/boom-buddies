@@ -14,9 +14,13 @@ import { TILE } from './field.js';
 const HALF = 0.40;          // hitbox half-extent in tiles
 /* Corner-cut: when the player is pressing one axis and gets blocked because
    their perpendicular position is slightly off-center, nudge toward the tile
-   center on that perpendicular axis.  This rate is in tiles/sec and only
-   applies during an active blocked move — never at rest. */
-const CORNER_NUDGE_RATE = 5.0;
+   center on that perpendicular axis.  We use max(static rate, 1.6 × current
+   speed) so the nudge is ALWAYS at least a bit faster than forward motion —
+   otherwise speed-boosted players overshoot before the cut completes. */
+const CORNER_NUDGE_BASE = 8.0;
+const CORNER_NUDGE_FACTOR = 1.6;
+/* Off-center tolerance: don't waste a tick nudging by less than this. */
+const CORNER_TOLERANCE = 0.05;
 
 export function createPlayer(slot, schemeId, charId, controllerType, displayName){
   return {
@@ -77,18 +81,19 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles, elapsed){
      glide through walls but not through your own ticking explosives). */
   const ghosting = elapsed != null && elapsed < p.ghostUntil;
 
+  /* Corner-cut nudge magnitude scales with current speed so it's always
+     fast enough to "catch up" before the player runs past a corridor. */
+  const nudgeRate = Math.max(CORNER_NUDGE_BASE, speed * CORNER_NUDGE_FACTOR);
+
   if(dx !== 0){
     const nx = p.x + dx * speed * dt;
     if(canFit(field, nx, p.y, solidBombTiles, ghosting)){
       p.x = nx;
     } else if(dy === 0){
-      /* Corner-cut on Y: if blocked moving along X with no Y input, try a
-         small nudge toward the nearest Y tile center.  Often that's all that
-         was preventing the move (one corner of the AABB clipping a wall). */
       const cy = Math.floor(p.y) + 0.5;
       const off = cy - p.y;
-      if(Math.abs(off) > 0.02){
-        const nudge = Math.sign(off) * Math.min(CORNER_NUDGE_RATE * dt, Math.abs(off));
+      if(Math.abs(off) > CORNER_TOLERANCE){
+        const nudge = Math.sign(off) * Math.min(nudgeRate * dt, Math.abs(off));
         if(canFit(field, nx, p.y + nudge, solidBombTiles, ghosting)){
           p.y += nudge;
           p.x = nx;
@@ -104,8 +109,8 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles, elapsed){
     } else if(dx === 0){
       const cx = Math.floor(p.x) + 0.5;
       const off = cx - p.x;
-      if(Math.abs(off) > 0.02){
-        const nudge = Math.sign(off) * Math.min(CORNER_NUDGE_RATE * dt, Math.abs(off));
+      if(Math.abs(off) > CORNER_TOLERANCE){
+        const nudge = Math.sign(off) * Math.min(nudgeRate * dt, Math.abs(off));
         if(canFit(field, p.x + nudge, ny, solidBombTiles, ghosting)){
           p.x += nudge;
           p.y = ny;
