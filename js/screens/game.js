@@ -28,6 +28,7 @@ let engine = null;
 let timerHandle = null;
 let endTransitionHandle = null;
 let netHandles = null;     // host: { broadcastInterval, off }; client: { sendInterval, input, off }
+let detachTouch = null;    // cleanup for touch-pad listeners
 
 const ROUND_END_DELAY_MS = 1500;
 
@@ -105,6 +106,9 @@ function renderHostOrLocal(ctx){
     scheduleRoundEnd(ctx, result, isHost);
   });
 
+  /* Touch controls — appears only on touch devices via @media. */
+  detachTouch = attachTouchControls(section);
+
   /* Host network setup: broadcast field once, then state every interval, and
      wire MSG_INPUT messages from guests into remoteInputs. */
   if(isHost){
@@ -176,7 +180,49 @@ function gameShell(match, initialSecs){
       </div>
       <div class="gpcol right" id="rightHud"></div>
     </div>
+    <div class="touch-pad" data-touch>
+      <div class="stick">
+        <button class="up"    data-key="KeyW">▲</button>
+        <button class="down"  data-key="KeyS">▼</button>
+        <button class="left"  data-key="KeyA">◀</button>
+        <button class="right" data-key="KeyD">▶</button>
+      </div>
+      <button class="bomb" data-key="Space">BOMB</button>
+    </div>
   `;
+}
+
+/* Wire each touch button to synthesize keydown/keyup so the existing input
+   system picks it up.  Multi-touch friendly: separate touches on different
+   buttons map to separate keys.  Returns a cleanup function. */
+function attachTouchControls(section){
+  const buttons = section.querySelectorAll('[data-touch] [data-key]');
+  if(!buttons.length) return () => {};
+  const dispatch = (type, code) => window.dispatchEvent(new KeyboardEvent(type, { code }));
+  const handlers = [];
+  buttons.forEach(btn => {
+    const code = btn.getAttribute('data-key');
+    const onDown = (e) => { e.preventDefault(); btn.classList.add('held'); dispatch('keydown', code); };
+    const onUp   = (e) => { e.preventDefault(); btn.classList.remove('held'); dispatch('keyup', code); };
+    btn.addEventListener('touchstart', onDown, { passive: false });
+    btn.addEventListener('touchend',   onUp,   { passive: false });
+    btn.addEventListener('touchcancel',onUp,   { passive: false });
+    /* Mouse fallback for desktop testing. */
+    btn.addEventListener('mousedown',  onDown);
+    btn.addEventListener('mouseup',    onUp);
+    btn.addEventListener('mouseleave', onUp);
+    handlers.push({ btn, onDown, onUp });
+  });
+  return () => {
+    for(const { btn, onDown, onUp } of handlers){
+      btn.removeEventListener('touchstart', onDown);
+      btn.removeEventListener('touchend',   onUp);
+      btn.removeEventListener('touchcancel',onUp);
+      btn.removeEventListener('mousedown',  onDown);
+      btn.removeEventListener('mouseup',    onUp);
+      btn.removeEventListener('mouseleave', onUp);
+    }
+  };
 }
 
 function scheduleRoundEnd(ctx, result, isHost){
@@ -211,6 +257,7 @@ export function teardown(){
     if(netHandles.conn) netHandles.conn.removeAllListeners?.('data');
     netHandles = null;
   }
+  if(detachTouch){ detachTouch(); detachTouch = null; }
 }
 
 /* ============ CLIENT MODE ============
@@ -272,6 +319,10 @@ function renderClient(ctx){
   }
 
   netHandles = { sendInterval, input, conn: ctx.net.client.conn };
+
+  /* Touch controls — synthesized keystrokes feed the local input that ships
+     to the host on the same interval. */
+  detachTouch = attachTouchControls(section);
 }
 
 function handleClientNetMsg(m, ctx, view, remote, boardEl, section){

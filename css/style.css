@@ -83,6 +83,64 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
 }
 .boom-shake{animation:boomShake .26s ease-out}
 
+/* ============ TOUCH CONTROLS — only on touch devices ============ */
+.touch-pad{display:none}
+@media (hover:none) and (pointer:coarse){
+  .touch-pad{
+    display:grid;
+    position:fixed;
+    left:0;right:0;bottom:0;
+    grid-template-columns:1fr 1fr;
+    padding:14px 18px env(safe-area-inset-bottom, 14px);
+    gap:14px;
+    z-index:50;
+    pointer-events:none;
+  }
+  .touch-pad .stick,
+  .touch-pad .bomb{pointer-events:auto}
+  .touch-pad .stick{
+    position:relative;
+    width:170px;height:170px;
+    background:rgba(255,255,255,.7);
+    border:3px solid var(--ink);
+    border-radius:50%;
+    box-shadow:0 4px 0 var(--ink);
+    justify-self:start;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+  }
+  .touch-pad .stick button{
+    position:absolute;
+    width:54px;height:54px;
+    background:var(--peach2);
+    border:2.5px solid var(--ink);
+    border-radius:50%;
+    font-family:'Fredoka';font-weight:700;font-size:22px;color:var(--ink);
+    box-shadow:0 3px 0 var(--ink);
+    touch-action:none;
+  }
+  .touch-pad .stick button.held{background:var(--peach);transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+  .touch-pad .stick .up   {top:6px;left:50%;transform:translateX(-50%)}
+  .touch-pad .stick .down {bottom:6px;left:50%;transform:translateX(-50%)}
+  .touch-pad .stick .left {left:6px;top:50%;transform:translateY(-50%)}
+  .touch-pad .stick .right{right:6px;top:50%;transform:translateY(-50%)}
+  .touch-pad .stick .up.held   {transform:translateX(-50%) translateY(2px)}
+  .touch-pad .stick .down.held {transform:translateX(-50%) translateY(2px)}
+  .touch-pad .stick .left.held {transform:translateY(-50%) translateY(2px)}
+  .touch-pad .stick .right.held{transform:translateY(-50%) translateY(2px)}
+  .touch-pad .bomb{
+    justify-self:end;align-self:end;
+    width:120px;height:120px;border-radius:50%;
+    background:var(--pink);color:#fff;
+    font-family:'Fredoka';font-weight:700;font-size:18px;
+    border:3px solid var(--ink);
+    box-shadow:0 6px 0 var(--berry);
+    touch-action:none;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .touch-pad .bomb.held{transform:translateY(3px);box-shadow:0 3px 0 var(--berry)}
+}
+
 /* =================================================
    1) TITLE
    ================================================= */
