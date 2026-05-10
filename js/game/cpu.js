@@ -260,7 +260,9 @@ function planClear(me, view, danger, reach){
   return assembleRoute('clear', me, reach, best.x, best.y, true, best.escape);
 }
 
-/* Goal 3: PICKUP — closest pickup with a positive value. */
+/* Goal 2: PICKUP — closest reachable pickup, irrespective of type (skipping
+   only the negative ones like Curse).  Per user request: among multiple
+   candidates, pick the shortest path. */
 function planPickup(me, view, reach){
   if(view.pickups.length === 0) return null;
   let best = null;
@@ -269,9 +271,8 @@ function planPickup(me, view, reach){
     if(!info) continue;
     const value = PICKUP_VALUE[pu.type] ?? 30;
     if(value <= 0) continue;
-    const score = value * 10 - info.dist;
-    if(!best || score > best.score){
-      best = { x: pu.x, y: pu.y, dist: info.dist, score };
+    if(!best || info.dist < best.dist){
+      best = { x: pu.x, y: pu.y, dist: info.dist };
     }
   }
   if(!best) return null;
