@@ -71,11 +71,18 @@ export function createCpuController(level = 'nice'){
      goals — adds the human-like irregularity the spec calls for. */
   const personalNoise = Math.random() * 6 - 3;
 
-  /* State machine.  `plan` is the current commitment; null means "decide". */
-  let plan = null;        // { kind, path: [[x,y],...], stepIdx, target?: {tx,ty}, expiresAt? }
+  /* State machine.  `plan` is the current commitment; null means "decide".
+     A plan is a ROUTE (path of tiles).  Once chosen we commit to it and
+     walk it; we only abandon it if it becomes physically unsafe, the
+     destination becomes meaningless (pickup gone, target no longer
+     valuable), or we reach the end. */
+  let plan = null;
   let nextBombAt = -999;
-  /* Tiles touched by recent blasts; keyed 'x,y' -> elapsed-time-cleared-at. */
   const recentDanger = new Map();
+  /* The tile we last completed a plan on — used to break the "I just got
+     here, the closest high-score tile is where I came from" oscillation
+     by penalising backtracking for one replan. */
+  let prevPlanCompletedTile = null;
 
   return {
     decide(me, view){
@@ -83,21 +90,13 @@ export function createCpuController(level = 'nice'){
       const myTx = Math.floor(me.x);
       const myTy = Math.floor(me.y);
 
-      /* Update recent-danger memory.  When a tile is in any current blast we
-         note it; when a tile that was previously dangerous becomes clear we
-         start its fade timer. */
       updateRecentDanger(view, recentDanger, t);
-
       const danger = buildDangerMap(view);
 
-      /* ---- P1 — immediate threat handling.  Critical: if our existing plan
-         is still safe (every tile satisfies the arrival-time check against
-         the current danger map), we KEEP IT, even if our current tile happens
-         to be a transit blast tile.  Otherwise the CPU oscillates: in tight
-         spawns the only "safe island" is one tile, and any sensible long-term
-         goal requires crossing a blast tile briefly.  Flipping to a "flee
-         back to the island" plan every time we step into the blast deadlocks
-         the CPU in place until the bomb explodes — and kills it. ---- */
+      /* ---- P1 — immediate threat handling.  The current plan stays in
+         charge as long as its remaining tiles are still safe-on-arrival;
+         only when the plan can't survive the new danger map do we throw
+         it away and compute a fresh flee path. ---- */
       const myBlast = danger.get(myTx + ',' + myTy);
       if(myBlast !== undefined){
         if(plan && plan.path
@@ -106,26 +105,13 @@ export function createCpuController(level = 'nice'){
           return executePlan(plan, me, view, danger);
         }
         const escape = findEscapePath(view, me, danger);
-        plan = escape
-          ? { kind: 'flee', path: escape.path, stepIdx: 0 }
-          : null;
+        plan = escape ? { kind: 'flee', path: escape.path, stepIdx: 0 } : null;
         return executePlan(plan, me, view, danger)
             || anyPassableNeighborCmd(view, me, myTx, myTy)
             || idle();
       }
 
-      /* ---- P2 — committed retreat: walk the full escape path ---- */
-      if(plan && plan.kind === 'retreat'){
-        if(planComplete(plan, me)) plan = null;
-        else if(!planStepStillSafe(plan, view, me, danger)){
-          /* Path was cut by a new bomb — re-plan flee from here. */
-          plan = null;
-        } else {
-          return executePlan(plan, me, view, danger);
-        }
-      }
-
-      /* ---- P3 — at attack target: plant bomb if escape is verified ---- */
+      /* ---- P2 — at attack target, plant bomb if escape is verified ---- */
       if(plan && plan.kind === 'attack' && plan.target
          && tileReached(me, plan.target)){
         if(t > nextBombAt && me.bombsLive < me.bombMax){
@@ -139,7 +125,14 @@ export function createCpuController(level = 'nice'){
         plan = null;
       }
 
-      /* ---- P4 — continue committed attack walk if still valid ---- */
+      /* ---- P3 — committed retreat: walk the full escape path ---- */
+      if(plan && plan.kind === 'retreat'){
+        if(planComplete(plan, me)){ prevPlanCompletedTile = myTx+','+myTy; plan = null; }
+        else if(!planStepStillSafe(plan, view, me, danger)) plan = null;
+        else return executePlan(plan, me, view, danger);
+      }
+
+      /* ---- P4 — committed attack walk ---- */
       if(plan && plan.kind === 'attack'){
         if(!planStepStillSafe(plan, view, me, danger)
            || !attackTargetStillValuable(plan.target, view, me)){
@@ -149,28 +142,24 @@ export function createCpuController(level = 'nice'){
         }
       }
 
-      /* ---- P5 — pursuing pickup/position?  Same validation. ---- */
+      /* ---- P5 — pursuing pickup/position ---- */
       if(plan && (plan.kind === 'pickup' || plan.kind === 'position')){
-        if(planComplete(plan, me)) plan = null;
+        if(planComplete(plan, me)){ prevPlanCompletedTile = myTx+','+myTy; plan = null; }
         else if(!planStepStillSafe(plan, view, me, danger)) plan = null;
         else if(plan.kind === 'pickup' && !pickupStillThere(plan.target, view)) plan = null;
         else return executePlan(plan, me, view, danger);
       }
 
-      /* ---- P6 — choose a new plan from scored candidates ---- */
-      const newPlan = choosePlan(view, me, danger, recentDanger, t, isMean, personalNoise);
+      /* ---- P6 — choose a new committed route.  Penalise the tile we
+         just came from so we don't immediately backtrack. ---- */
+      const newPlan = choosePlan(view, me, danger, recentDanger, t, isMean, personalNoise, prevPlanCompletedTile);
       if(newPlan){
         plan = newPlan;
-        return executePlan(plan, me, view, danger)
-            || idle();
+        prevPlanCompletedTile = null;   // consumed
+        return executePlan(plan, me, view, danger) || idle();
       }
 
-      /* ---- P7 — fallback.  Drift toward a tile with more exits, but never
-         into a blast: if the only passable neighbours are in blast zones,
-         the right move is to STAY PUT on our safe tile until the blast
-         clears.  Walking into a blast just because we have nothing better
-         to do is what kills the CPU when its goals are all temporarily
-         unreachable. ---- */
+      /* ---- P7 — fallback wander toward a tile with more exits ---- */
       return pickControlledStep(view, me, danger, recentDanger, t) || idle();
     },
     _debug(){ return { plan }; },
@@ -499,7 +488,7 @@ function executePlan(plan, me, view, danger){
    Goal selection.
    ==================================================== */
 
-function choosePlan(view, me, danger, recentDanger, t, isMean, noise){
+function choosePlan(view, me, danger, recentDanger, t, isMean, noise, prevCompletedTile){
   const visited = bfsSafe(view, me, danger, SAFETY_MARGIN);
   const enemies = view.players.filter(p => p.idx !== me.idx && p.alive);
   const enemyTiles = new Set(enemies.map(e => Math.floor(e.x) + ',' + Math.floor(e.y)));
@@ -511,6 +500,12 @@ function choosePlan(view, me, danger, recentDanger, t, isMean, noise){
     const [x, y] = k.split(',').map(Number);
     const tileSafe = !danger.has(k);
     const recPenalty = recentDangerPenalty(recentDanger, k, t);
+    /* Backtrack penalty: when picking a fresh plan, the tile we just
+       completed our previous plan on is the most "boring" possible target
+       — going right back where we came from is the textbook oscillation.
+       The penalty is small (8) so it only nudges away from immediate
+       backtrack, not from genuinely strategic targets. */
+    const backtrackPenalty = prevCompletedTile && k === prevCompletedTile ? 8 : 0;
 
     /* PICKUP — must be permanently safe and reachable. */
     if(tileSafe && info.dist > 0){
@@ -521,7 +516,7 @@ function choosePlan(view, me, danger, recentDanger, t, isMean, noise){
           candidates.push({
             kind: 'pickup',
             target: { tx: x, ty: y, type: pu.type },
-            score: value - info.dist * 4 - recPenalty,
+            score: value - info.dist * 4 - recPenalty - backtrackPenalty,
             dist: info.dist,
           });
         } else if(value < 0){
@@ -556,7 +551,8 @@ function choosePlan(view, me, danger, recentDanger, t, isMean, noise){
                       + cratesNearEnemy * 14
                       + enemyHits * (isMean ? 280 : 220)
                       - info.dist * 5
-                      - recPenalty;
+                      - recPenalty
+                      - backtrackPenalty;
           candidates.push({
             kind: 'attack',
             target: { tx: x, ty: y },
@@ -576,7 +572,7 @@ function choosePlan(view, me, danger, recentDanger, t, isMean, noise){
       candidates.push({
         kind: 'position',
         target: { tx: x, ty: y },
-        score: distFromCornerBonus + Math.min(info.dist, 12) * 0.7 - recPenalty,
+        score: distFromCornerBonus + Math.min(info.dist, 12) * 0.7 - recPenalty - backtrackPenalty,
         dist: info.dist,
       });
     }
