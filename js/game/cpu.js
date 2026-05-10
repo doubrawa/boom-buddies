@@ -368,23 +368,33 @@ function computeEscape(me, view, bx, by){
     }
   }
 
-  /* BFS from (bx,by) under the hypothetical danger.  Find the closest
-     permanently-safe tile (not in any blast) AT LEAST 2 tiles past the
-     last blast tile in our chosen direction — body extent (half=0.4) will
-     otherwise leave the AABB straddling the previous (blast) tile when
-     the CPU stops.  We approximate this by requiring dist ≥ range + 2:
-     for range-2 bombs, dist ≥ 4. */
+  /* BFS from (bx,by) under the hypothetical danger.  Two tiers, in order:
+       1. CORNER escape — destination differs from the bomb tile in BOTH x
+          AND y, so a pillar or wall is between us and any future bomb at
+          this spot.  Minimum distance range + 2 (body extent buffer).
+       2. STRAIGHT escape — destination shares the bomb's row or column.
+          A future fire-up bomb here could reach us, so we walk one more
+          tile out: minimum distance range + 3. */
   const visited = bfsSafe(me, view, hyDanger, bx, by);
-  const minDist = me.range + 2;
-  let best = null;
+  const minCornerDist = me.range + 2;
+  const minStraightDist = me.range + 3;
+  let cornerBest = null;
+  let straightBest = null;
   for(const [k, info] of visited){
-    if(info.dist < minDist) continue;
     if(hyDanger.has(k)) continue;
-    if(!best || info.dist < best.dist){
-      const [x, y] = k.split(',').map(Number);
-      best = { x, y, dist: info.dist };
+    const [x, y] = k.split(',').map(Number);
+    const isCorner = (x !== bx) && (y !== by);
+    if(isCorner && info.dist >= minCornerDist){
+      if(!cornerBest || info.dist < cornerBest.dist){
+        cornerBest = { x, y, dist: info.dist };
+      }
+    } else if(!isCorner && info.dist >= minStraightDist){
+      if(!straightBest || info.dist < straightBest.dist){
+        straightBest = { x, y, dist: info.dist };
+      }
     }
   }
+  const best = cornerBest || straightBest;
   if(!best) return null;
   return reconstructPath(visited, bx, by, best.x, best.y);
 }
