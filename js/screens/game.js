@@ -13,6 +13,7 @@ import {
 } from '../net/protocol.js';
 import {
   sfxBombPlace, sfxExplosion, sfxPickup, sfxDeath, sfxShield, sfxRoundEnd,
+  sfxEarthquake,
 } from '../audio.js';
 
 const SNAPSHOT_INTERVAL_MS = 50;       // 20 Hz state broadcast
@@ -663,6 +664,13 @@ function handleEvents(events, view, engine){
       if(card) card.classList.add('dead');
     } else if(ev.type === 'shieldUsed'){
       sfxShield();
+    } else if(ev.type === 'earthquakeStarted'){
+      sfxEarthquake();
+      const board = view.bombLayer?.parentElement;
+      if(board){
+        board.classList.add('quake-shake');
+        setTimeout(() => board.classList.remove('quake-shake'), ev.duration * 1000);
+      }
     } else if(ev.type === 'pickupTaken'){
       sfxPickup();
       const card = view.hudByIdx.get(ev.idx);

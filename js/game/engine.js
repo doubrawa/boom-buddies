@@ -125,6 +125,7 @@ export function createEngine(lobby, hooks, opts = {}){
   function startEarthquake(){
     earthquakeUntil = elapsed + EARTHQUAKE_DURATION;
     earthquakeNextStep = elapsed;
+    pendingEvents.push({ type: 'earthquakeStarted', duration: EARTHQUAKE_DURATION });
   }
 
   function pickupCtx(){
