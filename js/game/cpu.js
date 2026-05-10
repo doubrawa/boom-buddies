@@ -118,15 +118,14 @@ export function createCpuController(level = 'nice'){
         return walkToward(me, step);
       }
 
-      /* Walk step.  Advance when we've crossed onto the target tile —
-         EXCEPT the final step of the route, which must be fully centred
-         on so the body extent is entirely on the (safe) destination tile,
-         not straddling an adjacent blast tile. */
+      /* Walk step.  EVERY step must be fully centred on before advancing,
+         so the CPU walks to the centre of each tile before turning.
+         Otherwise it changes axis mid-tile and the body extent straddles
+         perpendicular tiles around corners — that's the "hanging at
+         corners" feel.  Centring at every step costs a couple of extra
+         ticks per turn but keeps movement clean and predictable. */
       if(myTx === step.x && myTy === step.y){
-        const isFinal = stepIdx === route.steps.length - 1;
-        if(isFinal && !tileReached(me, step)){
-          return walkToward(me, step);
-        }
+        if(!tileReached(me, step)) return walkToward(me, step);
         stepIdx++;
         if(stepIdx >= route.steps.length) return idle();
         return walkToward(me, route.steps[stepIdx]);
@@ -190,7 +189,7 @@ function planEnemyGoal(me, view, reach, allowBomb){
       let hits = 0;
       for(const s of segs) if(enemyTiles.has(s.x + ',' + s.y)) hits++;
       if(hits === 0) continue;
-      const escape = computeEscape(me, view, x, y, me.range + 3, me.range + 4);
+      const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 2);
       if(!escape) continue;
       const score = hits * 100 - info.dist;
       if(!best || score > best.score){
@@ -246,9 +245,7 @@ function planClear(me, view, danger, reach){
       if(view.field.at(s.x, s.y) === TILE.BOX) crates++;
     }
     if(crates === 0) continue;
-    /* CLEAR escapes can be tighter — crate-clearing is the bread-and-butter
-       way to make progress in dense fields. */
-    const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 3);
+    const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 2);
     if(!escape) continue;
     /* Crates × 1000 dominates the score; distance is only a tiebreak. */
     const score = crates * 1000 - info.dist;
