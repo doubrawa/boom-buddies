@@ -520,7 +520,26 @@ function renderBombs(view, bombs){
       entry = { wrap, inner, hot: false };
       view.bombSprites.set(b.id, entry);
     }
-    entry.wrap.style.transform = `translate(${((b.x + 0.5) * TS).toFixed(2)}px, ${((b.y + 0.5) * TS).toFixed(2)}px)`;
+    const newX = (b.x + 0.5) * TS;
+    const newY = (b.y + 0.5) * TS;
+    /* If the bomb just wrapped from one edge to the other (kicked bombs
+       loop around the field), the position jumps more than a single
+       tile.  Without intervention the CSS transition animates that whole
+       distance in 0.12 s — looking like the bomb scrolls back across the
+       board.  Disable the transition for this update so the bomb simply
+       teleports to its new tile instead. */
+    if(entry.lastX !== undefined &&
+       (Math.abs(newX - entry.lastX) > TS * 1.5 || Math.abs(newY - entry.lastY) > TS * 1.5)){
+      entry.wrap.style.transition = 'none';
+      entry.wrap.style.transform = `translate(${newX.toFixed(2)}px, ${newY.toFixed(2)}px)`;
+      /* Force layout to commit the new transform with transition:none, then
+         re-enable the transition for subsequent steps. */
+      void entry.wrap.offsetWidth;
+      entry.wrap.style.transition = 'transform 0.12s linear';
+    } else {
+      entry.wrap.style.transform = `translate(${newX.toFixed(2)}px, ${newY.toFixed(2)}px)`;
+    }
+    entry.lastX = newX; entry.lastY = newY;
     const shouldBeHot = b.fuse <= HOT_THRESHOLD;
     if(shouldBeHot && !entry.hot){
       entry.hot = true;

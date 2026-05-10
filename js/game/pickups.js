@@ -12,7 +12,7 @@ export const PICKUP_POOL = [
   'bomb', 'bomb', 'fire', 'fire',
   'remote', 'shield', 'ghost', 'slow',
   'kick', 'magnet', 'curse',
-  'hook', 'swap', 'earthquake',
+  'hook', 'dash', 'earthquake',
 ];
 
 /* Caps so a runaway match doesn't produce comical superplayers. */
@@ -38,6 +38,8 @@ export const EARTHQUAKE_DURATION = 3;
 export const EARTHQUAKE_INTERVAL = 0.5;
 /* Hook: max tiles the grappling hook can travel before stopping. */
 export const HOOK_MAX_RANGE = 12;
+/* Dash: how many tiles forward the dash carries the player. */
+export const DASH_TILES = 2;
 
 let nextPickupId = 1;
 
@@ -87,9 +89,10 @@ export function applyPickup(player, type, ctx){
     case 'hook':
       ctx.hook(player);
       break;
-    /* Swap — instantly trades positions with the nearest living enemy. */
-    case 'swap':
-      ctx.swap(player);
+    /* Dash — short forward sprint, passes through bombs but not walls,
+       crates, or other players. */
+    case 'dash':
+      ctx.dash(player);
       break;
     /* Earthquake — for the next few seconds every live bomb jiggles one
        tile in a random direction at a fixed cadence. */

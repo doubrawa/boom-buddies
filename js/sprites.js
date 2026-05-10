@@ -32,12 +32,12 @@ export const PUPS = {
   magnet: { nm:'Magnet',      ds:'pulls power-ups',        sym:'#pu-magnet', bg:'#ffd0d6' },
   curse:  { nm:'Curse',       ds:'rotten · 5s debuff',     sym:'#pu-skull',  bg:'#fff'    },
   hook:       { nm:'Hook',       ds:'grapple to a wall',     sym:'#pu-hook',       bg:'#cfe9ff' },
-  swap:       { nm:'Swap',       ds:'trade spots w/ enemy',  sym:'#pu-swap',       bg:'#e0cef7' },
+  dash:       { nm:'Dash',       ds:'sprint 2 tiles forward',sym:'#pu-dash',       bg:'#e0cef7' },
   earthquake: { nm:'Earthquake', ds:'bombs jiggle 3s',       sym:'#pu-earthquake', bg:'#ffd0d6' },
 };
 
 /* All powerup IDs in display order for the reference panel. */
-export const ALL_PUP_IDS = ['fire','bomb','kick','shield','ghost','slow','magnet','remote','curse','hook','swap','earthquake'];
+export const ALL_PUP_IDS = ['fire','bomb','kick','shield','ghost','slow','magnet','remote','curse','hook','dash','earthquake'];
 
 /* ====================================================
    Helpers — every function returns a real SVG element
