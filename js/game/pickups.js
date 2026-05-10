@@ -6,11 +6,11 @@
 export const DROP_CHANCE = [0.15, 0.30, 0.50];
 
 /* All 12 power-ups now have working mechanics — drop pool covers everything.
-   `bomb` and `fire` appear twice so they're drawn at double the rate of the
-   rest: extra carry slots and bigger blasts are the most playable upgrades,
-   so we want them to show up more often. */
+   `bomb` and `fire` appear three times so they're drawn at triple the rate
+   of the rest: extra carry slots and bigger blasts are the most playable
+   upgrades, so we want them to show up reliably. */
 export const PICKUP_POOL = [
-  'bomb', 'bomb', 'fire', 'fire',
+  'bomb', 'bomb', 'bomb', 'fire', 'fire', 'fire',
   'speed', 'remote', 'shield', 'super', 'ghost', 'slow',
   'kick', 'magnet', 'curse', 'boomerang',
 ];
