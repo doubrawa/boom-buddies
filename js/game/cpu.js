@@ -86,8 +86,16 @@ export function createCpuController(level = 'nice'){
         route = null; stepIdx = 0; stuckTicks = 0;
       }
 
-      /* ── PLAN ROUTE if we don't have one ────────────────────────────── */
+      /* ── PLAN ROUTE if we don't have one ──────────────────────────────
+         If our own bomb is still ticking AND we're already standing on a
+         safe (non-blast) tile, just wait it out — committing to a fresh
+         route now would walk us back through the blast zone of the bomb
+         we just placed.  The survival reflex above still kicks in if
+         another CPU drops a bomb that catches our position. */
       if(!route || stepIdx >= route.steps.length){
+        if(me.bombsLive > 0 && !danger.has(myTx + ',' + myTy)){
+          return idle();
+        }
         const allowBomb = view.elapsed >= startupDelay;
         route = planRoute(me, view, danger, allowBomb);
         stepIdx = 0;
