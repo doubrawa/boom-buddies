@@ -18,7 +18,7 @@ import { createCpuController } from './cpu.js';
 
 const HUMAN_SCHEMES = ['wasd', 'arrows', 'ijkl', 'numpad'];
 /* Lobby-level speed setting applied uniformly to every player. */
-const SPEED_FACTORS = { slow: 0.7, normal: 1.0, fast: 1.4 };
+const SPEED_FACTORS = { slow: 0.7, normal: 1.0, fast: 1.5 };
 const BASE_SPEED = 4.5;
 
 export function createEngine(lobby, hooks, opts = {}){

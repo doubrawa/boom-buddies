@@ -35,7 +35,7 @@ const ESCAPE_MARGIN = 1.2;          // arrival + this < blast time
    tile, even one just placed.  This is the only mid-route override; without
    it the CPU walks committed escape paths that another CPU's bomb has cut. */
 const SURVIVAL_THRESHOLD = 4.0;
-const STUCK_TICKS_MAX = 30;         // can't move for this many ticks → abandon
+const STUCK_TICKS_MAX = 8;          // can't move for this many ticks → abandon route, replan
 
 const PICKUP_VALUE = {
   bomb: 100, fire: 100, shield: 80, super: 80, speed: 70,
@@ -284,11 +284,18 @@ function planExplore(me, view, reach, prevTile = null){
 }
 
 /* CLEAR candidate: a bomb position that destroys at least one crate.
-   Among many candidates, the score weighs crate count against distance,
-   with a chain bonus for placements that cascade with our existing bombs. */
+   Score is scaled by how many crates remain on the field — early game
+   (lots of crates) we prioritise CLEAR; late game (few crates) it drops
+   well below ATTACK and PICKUP, since end-game is about killing not
+   chopping wood. */
 function planClearCandidate(me, view, reach){
   if(me.bombsLive >= me.bombMax) return null;
   const chainTiles = ownBombBlastTiles(view, me);
+  const totalCrates = countCrates(view.field);
+  /* Multiplier: ~1.2 when ≥60 crates left, smoothly down to 0.3 when
+     few are left.  Threshold 60 is a typical post-spawn crate count on
+     a medium field. */
+  const crateFactor = Math.min(1.2, Math.max(0.3, totalCrates / 60));
 
   let best = null;
   for(const [k, info] of reach){
@@ -302,15 +309,23 @@ function planClearCandidate(me, view, reach){
     const escape = computeEscape(me, view, x, y, 2, me.range + 2);
     if(!escape) continue;
     const chains = chainTiles.has(k);
-    /* Base 50 + 30 per crate − 6 per tile of distance + chain bonus.
-       Chain bonus is large enough that a 1-crate cascade still beats a
-       2-crate non-cascade at the same distance. */
-    const score = 50 + crates * 30 - info.dist * 6 + (chains ? 200 : 0);
+    const rawScore = 50 + crates * 30 - info.dist * 6 + (chains ? 200 : 0);
+    const score = rawScore * crateFactor;
     if(isBetterCandidate({ x, y, score }, best)){
       best = { kind: 'clear', x, y, score, dist: info.dist, escape };
     }
   }
   return best;
+}
+
+function countCrates(field){
+  let c = 0;
+  for(let y = 0; y < field.height; y++){
+    for(let x = 0; x < field.width; x++){
+      if(field.at(x, y) === TILE.BOX) c++;
+    }
+  }
+  return c;
 }
 
 /* PICKUP candidate: closest reachable pickup with a positive value
