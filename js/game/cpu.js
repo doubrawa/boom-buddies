@@ -130,9 +130,10 @@ export function createCpuController(level = 'nice'){
       }
 
       /* ── ROUTE INTEGRITY ─────────────────────────────────────────────
-         The next tile we'd walk onto must not be about to explode.  If
-         another CPU's bomb covers it, abandon the route and replan. */
-      if(!nextStepStillSafe(route, stepIdx, danger, me)){
+         The next tile we'd walk onto must not be about to explode AND
+         must still be passable.  If another CPU's bomb covers it (blast)
+         or sits on it (blocking the tile), abandon the route and replan. */
+      if(!nextStepStillSafe(route, stepIdx, danger, view, me)){
         route = null; stepIdx = 0;
         return idle();
       }
@@ -656,10 +657,13 @@ function routeWillSave(route, stepIdx, danger, foreignWorst){
 
    Transit tiles (we'll walk through and off) only need a small buffer.
    The final step (where we stop) needs the full ESCAPE_MARGIN. */
-function nextStepStillSafe(route, stepIdx, danger, me){
+function nextStepStillSafe(route, stepIdx, danger, view, me){
   if(!route || stepIdx >= route.steps.length) return true;
   const step = route.steps[stepIdx];
   if(step.kind === 'bomb') return true;
+  /* Passability: a bomb just dropped on this tile blocks it; without
+     this check the CPU walks at the bomb until stuck-detection fires. */
+  if(!isPassable(view, me, step.x, step.y)) return false;
   const speed = Math.max(me.speed, 1);
   const arriveT = 1 / speed;
   const blastT = danger.get(step.x + ',' + step.y);
