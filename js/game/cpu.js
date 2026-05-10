@@ -191,7 +191,8 @@ function planAttack(me, view, danger, reach){
     let hits = 0;
     for(const s of segs) if(enemyTiles.has(s.x + ',' + s.y)) hits++;
     if(hits === 0) continue;
-    const escape = computeEscape(me, view, x, y);
+    /* ATTACK escapes are strict — high stakes, want big buffer. */
+    const escape = computeEscape(me, view, x, y, me.range + 3, me.range + 4);
     if(!escape) continue;
     const score = hits * 100 - info.dist;
     if(!best || score > best.score){
@@ -223,7 +224,11 @@ function planClear(me, view, danger, reach){
       }
     }
     if(crates === 0) continue;
-    const escape = computeEscape(me, view, x, y);
+    /* CLEAR escapes can be tighter — crate-clearing is the bread-and-butter
+       way to make progress in dense fields, and locking it behind a
+       range+3/+4 escape leaves the CPU pacing between unreachable bomb
+       spots without ever doing anything.  range+2/+3 is enough buffer. */
+    const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 3);
     if(!escape) continue;
     const score = crates * 10 + cratesNearEnemy * 25 - info.dist * 2;
     if(!best || score > best.score){
@@ -355,8 +360,13 @@ function reconstructPath(visited, fromTx, fromTy, toTx, toTy){
 }
 
 /* Compute a complete ESCAPE PATH from a hypothetical-bomb tile to a
-   permanently-safe destination, returning [[x,y],...] or null. */
-function computeEscape(me, view, bx, by){
+   permanently-safe destination, returning [[x,y],...] or null.  Callers
+   pick how strict the escape distance must be: ATTACK uses range+3 / +4,
+   CLEAR uses range+2 / +3 (we can afford a tighter escape when bombing
+   crates because crate-clearing is what makes ATTACK options reachable
+   in the first place; never bombing because the strict escape is
+   unreachable is the worse failure mode). */
+function computeEscape(me, view, bx, by, minCornerDist, minStraightDist){
   /* Hypothetical danger map = current bombs + new bomb at (bx,by). */
   const hyDanger = new Map();
   const allBombs = [...view.bombs, { id: -1, x: bx, y: by, range: me.range, fuse: FUSE_SECONDS, detonating: false }];
@@ -392,13 +402,11 @@ function computeEscape(me, view, bx, by){
   /* BFS from (bx,by) under the hypothetical danger.  Two tiers, in order:
        1. CORNER escape — destination differs from the bomb tile in BOTH x
           AND y, so a pillar or wall is between us and any future bomb at
-          this spot.  Minimum distance range + 3.
+          this spot.
        2. STRAIGHT escape — destination shares the bomb's row or column.
           A future fire-up bomb here could reach us, so we walk one more
-          tile out: minimum distance range + 4. */
+          tile out. */
   const visited = bfsSafe(me, view, hyDanger, bx, by);
-  const minCornerDist = me.range + 3;
-  const minStraightDist = me.range + 4;
   let cornerBest = null;
   let straightBest = null;
   for(const [k, info] of visited){
