@@ -218,7 +218,11 @@ function planEnemyGoal(me, view, reach, allowBomb){
       let hits = 0;
       for(const s of segs) if(enemyTiles.has(s.x + ',' + s.y)) hits++;
       if(hits === 0) continue;
-      const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 2);
+      /* Corner escape only needs distance 2 — the blast goes straight, not
+         diagonally, so any tile with a different row AND column from the
+         bomb is permanently outside the arms.  Straight escape still needs
+         range + 2 (must be past the last arm tile). */
+      const escape = computeEscape(me, view, x, y, 2, me.range + 2);
       if(!escape) continue;
       /* Chain bonus: spotting our own existing bomb's blast triggers a
          cascade.  Prefer chained placements when we have multiple bombs
@@ -285,7 +289,10 @@ function planClear(me, view, danger, reach){
       if(view.field.at(s.x, s.y) === TILE.BOX) crates++;
     }
     if(crates === 0) continue;
-    const escape = computeEscape(me, view, x, y, me.range + 2, me.range + 2);
+    /* Corner escape min distance 2 — going around a corner means the
+       blast can't reach us regardless of range.  Straight escape still
+       needs range + 2 (past the last arm tile). */
+    const escape = computeEscape(me, view, x, y, 2, me.range + 2);
     if(!escape) continue;
     /* Crates × 1000 dominates; distance is the tiebreak; chain placements
        (target tile sits in one of our own existing bombs' blasts) get a
