@@ -49,15 +49,6 @@ export function render(ctx){
       <h2 class="banner">${bannerText}</h2>
       <p class="subbanner">${subBanner}</p>
 
-      <div class="podium" data-podium></div>
-
-      <div class="scoreboard">
-        <div class="sb-h">
-          <span></span><span>Player</span><span>K/O</span><span>Power-ups</span><span>Time</span><span>Score</span>
-        </div>
-        <div data-rows></div>
-      </div>
-
       <div class="actions">
         <button class="pillbtn" data-action="menu">
           <span class="ic" data-spr="ico-back"></span>
@@ -78,6 +69,15 @@ export function render(ctx){
               Next Round
               <span class="arr">›</span>
             </button>`}
+      </div>
+
+      <div class="podium" data-podium></div>
+
+      <div class="scoreboard">
+        <div class="sb-h">
+          <span></span><span>Player</span><span>K/O</span><span>Power-ups</span><span>Time</span><span>Score</span>
+        </div>
+        <div data-rows></div>
       </div>
     </div>
   `;

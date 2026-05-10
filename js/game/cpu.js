@@ -392,13 +392,13 @@ function computeEscape(me, view, bx, by){
   /* BFS from (bx,by) under the hypothetical danger.  Two tiers, in order:
        1. CORNER escape — destination differs from the bomb tile in BOTH x
           AND y, so a pillar or wall is between us and any future bomb at
-          this spot.  Minimum distance range + 2 (body extent buffer).
+          this spot.  Minimum distance range + 3.
        2. STRAIGHT escape — destination shares the bomb's row or column.
           A future fire-up bomb here could reach us, so we walk one more
-          tile out: minimum distance range + 3. */
+          tile out: minimum distance range + 4. */
   const visited = bfsSafe(me, view, hyDanger, bx, by);
-  const minCornerDist = me.range + 2;
-  const minStraightDist = me.range + 3;
+  const minCornerDist = me.range + 3;
+  const minStraightDist = me.range + 4;
   let cornerBest = null;
   let straightBest = null;
   for(const [k, info] of visited){
