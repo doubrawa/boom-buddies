@@ -42,7 +42,7 @@ body{
 svg{display:block}
 img.spr,canvas.spr{image-rendering:pixelated;display:block}
 
-#app{display:block;max-width:1320px;margin:0 auto}
+#app{display:block;max-width:1700px;margin:0 auto}
 
 /* ---------------- screen base + routing ---------------- */
 .screen{
@@ -483,3 +483,103 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
 
 .actions{display:flex;gap:14px;justify-content:center;margin-top:8px;flex-wrap:wrap}
 .actions .pillbtn{width:auto;font-size:18px}
+
+/* =================================================
+   5) RESPONSIVE — mobile-friendly stacked layouts.
+   Threshold 900px catches phones in both orientations
+   plus narrow tablets.  Desktop layout above is left
+   intact so 16:9 monitors fill nicely.
+   ================================================= */
+@media (max-width: 900px){
+  body{padding:8px 6px}
+  #app{max-width:100%}
+  .screen{border-radius:18px;margin-bottom:12px;border-width:2.5px}
+
+  /* ---- title ---- */
+  .title{height:auto;min-height:auto;padding-bottom:40px}
+  .bigtitle{font-size:64px;-webkit-text-stroke:3px var(--ink);
+    filter:drop-shadow(0 3px 0 var(--pink)) drop-shadow(0 6px 0 var(--ink))}
+  .subtitle{font-size:16px;padding:5px 16px;margin-top:10px}
+  .logo-wrap{position:static;transform:none;padding:32px 12px 12px}
+  .logo-deco{display:none}
+  .menu{position:static;transform:none;width:min(96%, 380px);margin:8px auto 16px;gap:8px}
+  .pillbtn{font-size:16px;padding:14px 20px;box-shadow:0 4px 0 var(--ink)}
+  .title-mascots, .ground, .stars, .clouds, .corner-bunting{display:none}
+  .titlebadge, .credits{display:none}
+
+  /* ---- lobby ---- */
+  .lobby{padding:18px 14px 28px}
+  .lobby h2{font-size:24px}
+  .lobby .lead{font-size:12px;margin-bottom:14px}
+  .panel{padding:14px 14px;margin-bottom:14px;border-radius:18px;border-width:2.5px}
+  .panel-h{font-size:14px;margin-bottom:12px}
+  .fields{grid-template-columns:1fr;gap:10px}
+  .field{padding:12px;border-width:2.5px}
+  .field .preview{height:80px}
+  .pgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .pslot{padding:10px;border-width:2.5px}
+  .pslot .av .face{width:48px;height:48px}
+  .pslot .av .face svg{width:56px;height:56px;margin-top:4px}
+  .pslot .nm{font-size:14px;padding:6px 8px}
+  .twocol{grid-template-columns:1fr;gap:12px}
+  .seg-row span{font-size:12px;padding:8px 14px}
+  .start-btn{font-size:22px;padding:14px 28px;margin-top:18px}
+  .start-btn .ic{width:30px;height:30px}
+
+  /* ---- gameplay ---- */
+  .gp{grid-template-columns:1fr;min-height:auto}
+  .gpcol{padding:8px 8px}
+  .gpcol.left,.gpcol.right{
+    border-left:none;border-right:none;
+    border-top:2.5px solid var(--ink);
+    background:rgba(255,255,255,.7);
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
+    gap:8px;
+  }
+  .gpcol.right{border-bottom:2.5px solid var(--ink);border-top:none}
+  /* On mobile we put the board (stage) first so the player can see the
+     action without scrolling.  Both HUD columns live below as compact
+     horizontal grids of player cards. */
+  .gp .stage{order:0}
+  .gp .gpcol.left{order:1}
+  .gp .gpcol.right{order:2}
+  .pcard{margin-bottom:0;padding:8px;border-width:2.5px;border-radius:14px}
+  .pcard .face-sm{width:36px;height:36px}
+  .pcard .face-sm svg{width:44px;height:44px;margin:-4px 0 0 -4px}
+  .pcard .nm{font-size:13px}
+  .pcard .sc{font-size:14px}
+  .pcard .ctrl-row{display:none}
+  .stage{padding:8px 0}
+  .topbar{gap:8px;margin-bottom:10px}
+  .timer{font-size:30px;padding:6px 14px;border-width:2.5px}
+  .round-pill,.live-pill,.end-round{font-size:12px;padding:6px 12px;border-width:2.5px}
+
+  /* The "Powerups" reference panel below the board is purely decorative;
+     hide on phones to save real estate.  Players can see their own pickups
+     in the HUD cards above. */
+  .pup-row{display:none}
+
+  /* Leave clearance for the touch-pad. */
+  .gp{padding-bottom:200px}
+
+  /* ---- round end ---- */
+  .we{min-height:auto;padding-bottom:18px}
+  .we .banner{font-size:48px;-webkit-text-stroke:3px var(--ink);margin-top:28px;
+    filter:drop-shadow(0 3px 0 var(--peach)) drop-shadow(0 6px 0 var(--ink))}
+  .we .subbanner{font-size:14px}
+  .podium{margin-top:18px;gap:6px;flex-wrap:wrap}
+  .podium .ch{width:80px;height:90px}
+  .podium .ch.first{width:104px;height:118px}
+  .podium .ch svg{width:80px;height:80px}
+  .podium .ch.first svg{width:104px;height:104px}
+  .podium .pedestal{width:96px;font-size:22px}
+  .podium .col.first .pedestal{height:84px}
+  .podium .col.second .pedestal{height:58px}
+  .podium .col.third .pedestal{height:44px}
+  .scoreboard{padding:10px 10px;margin:16px 12px;border-radius:16px;border-width:2.5px}
+  .sb-h,.sb-row{grid-template-columns:22px 1fr 50px 80px 50px 50px;gap:6px;font-size:11px;padding:6px 4px}
+  .sb-row .nm-big{font-size:12px}
+  .sb-row .pup-mini span{width:18px;height:18px}
+  .actions .pillbtn{font-size:14px;padding:10px 18px}
+}

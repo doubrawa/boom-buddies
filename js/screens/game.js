@@ -19,11 +19,47 @@ import {
 const SNAPSHOT_INTERVAL_MS = 50;       // 20 Hz state broadcast
 const NET_INPUT_INTERVAL_MS = 50;      // client → host input cadence
 
-const TS = 42;                 // tile size in px — matches CSS .board --ts
-const PLAYER_SIZE = 40;        // sprite display size in px
-const BOMB_SIZE = 36;
-const BLAST_SIZE = 40;
-const PICKUP_SIZE = 28;
+/* Tile and sprite sizes are recomputed at every board build so the board
+   fills a 16:9 monitor and shrinks gracefully on a phone.  All sprite
+   sizes are derived from TS so proportions stay constant.  The constants
+   below are the ratios — TS=42 was the original baseline. */
+const PLAYER_RATIO = 40 / 42;
+const BOMB_RATIO   = 36 / 42;
+const BLAST_RATIO  = 40 / 42;
+const PICKUP_RATIO = 28 / 42;
+const TS_MIN = 22, TS_MAX = 64, TS_BASE = 42;
+let TS = TS_BASE;
+let PLAYER_SIZE = Math.round(TS * PLAYER_RATIO);
+let BOMB_SIZE   = Math.round(TS * BOMB_RATIO);
+let BLAST_SIZE  = Math.round(TS * BLAST_RATIO);
+let PICKUP_SIZE = Math.round(TS * PICKUP_RATIO);
+
+function computeTileSize(fieldW, fieldH){
+  /* Pick a tile size that lets the board fill the available stage area.
+       - On desktop the #app caps at 1700px; the two HUD sidebars take
+         about 540px between them and another ~60px goes to borders +
+         padding, leaving ~1100px of horizontal stage at the cap.
+       - On phones (< 900px) the three-column grid collapses (see CSS
+         media query) so the full viewport width is available.
+     vReserve accounts for the timer/round-pill bar above the board and
+     for chrome around the page. */
+  const isMobile = window.innerWidth < 900;
+  const appW = Math.min(window.innerWidth, 1700);
+  const hReserve = isMobile ? 40  : 600;
+  const vReserve = isMobile ? 380 : 200;
+  const availW = Math.max(220, (isMobile ? window.innerWidth : appW) - hReserve);
+  const availH = Math.max(220, window.innerHeight - vReserve);
+  const ts = Math.min(Math.floor(availW / fieldW), Math.floor(availH / fieldH));
+  return Math.max(TS_MIN, Math.min(TS_MAX, ts));
+}
+
+function applyTileSize(ts){
+  TS = ts;
+  PLAYER_SIZE = Math.round(TS * PLAYER_RATIO);
+  BOMB_SIZE   = Math.round(TS * BOMB_RATIO);
+  BLAST_SIZE  = Math.round(TS * BLAST_RATIO);
+  PICKUP_SIZE = Math.round(TS * PICKUP_RATIO);
+}
 
 let engine = null;
 let timerHandle = null;
@@ -420,7 +456,11 @@ function formatTime(s){ const m = Math.floor(s/60), ss = String(s%60).padStart(2
 /* ============ BOARD CONSTRUCTION ============ */
 
 function buildBoard(boardEl, field, view){
-  /* Board CSS uses --ts; size the grid to the actual field. */
+  /* Recompute tile size for the current viewport before laying out, so
+     the board fills the screen on desktop and shrinks on mobile. */
+  applyTileSize(computeTileSize(field.width, field.height));
+  view.TS = TS;
+  boardEl.style.setProperty('--ts', `${TS}px`);
   boardEl.style.gridTemplateColumns = `repeat(${field.width}, ${TS}px)`;
   boardEl.style.gridTemplateRows    = `repeat(${field.height}, ${TS}px)`;
   boardEl.style.position = 'relative';
