@@ -518,7 +518,7 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   .fields{grid-template-columns:1fr;gap:10px}
   .field{padding:12px;border-width:2.5px}
   .field .preview{height:80px}
-  .pgrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .pgrid{grid-template-columns:1fr;gap:10px}
   .pslot{padding:10px;border-width:2.5px}
   .pslot .av .face{width:48px;height:48px}
   .pslot .av .face svg{width:56px;height:56px;margin-top:4px}
