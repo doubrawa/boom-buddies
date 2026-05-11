@@ -84,7 +84,7 @@ export function render(ctx){
 function renderHostOrLocal(ctx){
   const { app, navigate, lobby, match } = ctx;
   const section = document.createElement('section');
-  section.className = 'screen active';
+  section.className = 'screen gp-screen active';
   const initialSecs = lobby.timeLimit || 0;
   const isHost = ctx.net?.role === 'host';
 
@@ -303,7 +303,7 @@ export function teardown(){
 function renderClient(ctx){
   const { app, navigate, lobby, match } = ctx;
   const section = document.createElement('section');
-  section.className = 'screen active';
+  section.className = 'screen gp-screen active';
   const initialSecs = lobby.timeLimit || 0;
   section.innerHTML = gameShell(match, initialSecs);
   app.appendChild(section);

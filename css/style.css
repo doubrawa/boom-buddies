@@ -529,23 +529,44 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   .start-btn .ic{width:30px;height:30px}
 
   /* ---- gameplay ---- */
-  /* On phones the stage owns the whole screen.  Switch .gp to a flex
-     column so the stage can take flex:1 and centre the topbar+board
-     pair vertically — otherwise the board sits glued to the top with a
-     huge empty area down to the fixed touch-pad. */
+  /* The gameplay screen takes the whole viewport on mobile: no body
+     padding, no border, no scroll.  Section becomes a flex column with
+     the .gp area filling top and the .touch-pad pinned right under the
+     board (no fixed positioning so the controls sit directly below the
+     play area, exactly where the thumbs are). */
+  .screen.gp-screen{
+    margin:0;
+    border:none;border-radius:0;
+    box-shadow:none;
+    height:100vh;height:100dvh;
+    max-height:100vh;max-height:100dvh;
+    overflow:hidden;
+    display:flex;flex-direction:column;
+  }
   .gp{
-    display:flex; flex-direction:column;
+    flex:1;min-height:0;
+    display:flex;flex-direction:column;
     grid-template-columns:none;
-    min-height:100vh;
-    padding-bottom:220px;
+    padding:0;
   }
   .gpcol.left,.gpcol.right{display:none}
-  .stage{flex:1;justify-content:center;padding:6px 0;gap:10px}
-  /* Tighten the top bar so it doesn't push the board off-centre. */
+  /* space-between pins the topbar to the top of .gp and the board to
+     the bottom — so the board hugs the touch-pad. */
+  .stage{flex:1;min-height:0;justify-content:space-between;padding:6px 0 0;gap:10px}
   .topbar{gap:8px;margin-bottom:0}
   .timer{font-size:26px;padding:5px 12px;border-width:2.5px}
   .timer .dot{width:9px;height:9px}
   .round-pill,.live-pill,.end-round{font-size:11px;padding:5px 10px;border-width:2.5px}
+  /* On the gameplay screen the touch-pad is part of the flex column
+     instead of pinned via position:fixed. */
+  .screen.gp-screen .touch-pad{
+    position:static;
+    padding:6px 12px env(safe-area-inset-bottom, 6px);
+    flex:none;
+  }
+  /* Body background still shows through any safe-area inset on the
+     gameplay screen — drop body padding there so the screen fills. */
+  body:has(.screen.gp-screen){padding:0}
 
   /* ---- round end ---- */
   .we{min-height:auto;padding-bottom:18px}
