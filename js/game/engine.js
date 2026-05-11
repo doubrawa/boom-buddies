@@ -307,16 +307,15 @@ export function createEngine(lobby, hooks, opts = {}){
     }
 
     /* 2a-eq. Earthquake — every EARTHQUAKE_INTERVAL while the effect is
-       active, jiggle every live bomb one tile in a random direction (only
-       if the destination is a free floor tile, no bomb, no player).  The
-       effect ends naturally when elapsed passes earthquakeUntil. */
+       active, every live bomb shakes one tile DOWNWARD (positive y) if
+       the tile beneath it is a free floor tile (no wall, no other bomb,
+       no player).  Bombs against an obstacle just sit until it clears.
+       The effect ends naturally when elapsed passes earthquakeUntil. */
     if(elapsed < earthquakeUntil && elapsed >= earthquakeNextStep){
       earthquakeNextStep = elapsed + EARTHQUAKE_INTERVAL;
-      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
       for(const b of bombs){
         if(b.detonating) continue;
-        const d = dirs[Math.floor(Math.random() * 4)];
-        const nx = b.x + d[0], ny = b.y + d[1];
+        const nx = b.x, ny = b.y + 1;
         if(field.at(nx, ny) !== TILE.FLOOR) continue;
         if(bombByTile.has(nx + ',' + ny)) continue;
         let blocked = false;
