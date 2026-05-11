@@ -121,10 +121,9 @@ function renderHostOrLocal(ctx){
   buildPowerupRow(section.querySelector('#pupGrid'));
   view.hudByIdx = new Map();
   const lh = section.querySelector('#leftHud');
-  const rh = section.querySelector('#rightHud');
-  const half = Math.ceil(engine.players.length / 2);
-  engine.players.slice(0, half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); lh.appendChild(c); });
-  engine.players.slice(half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); rh.appendChild(c); });
+  /* All player HUD cards live in the left column; the right column is
+     reserved for the power-up reference panel. */
+  engine.players.forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); lh.appendChild(c); });
 
   /* Timer. */
   const timerEl = section.querySelector('[data-timer]');
@@ -210,12 +209,13 @@ function gameShell(match, initialSecs){
           <button class="end-round" data-action="end-round">Forfeit ▶</button>
         </div>
         <div class="board" id="board"></div>
+      </div>
+      <div class="gpcol right" id="rightHud">
         <div class="pup-row">
-          <h4><span class="pip"></span>Power-ups · all 12 pickups</h4>
+          <h4><span class="pip"></span>Power-ups</h4>
           <div class="pup-grid" id="pupGrid"></div>
         </div>
       </div>
-      <div class="gpcol right" id="rightHud"></div>
     </div>
     <div class="touch-pad" data-touch>
       <div class="stick">
@@ -315,10 +315,8 @@ function renderClient(ctx){
   /* HUD now, board on receipt of MSG_FIELD. */
   view.hudByIdx = new Map();
   const lh = section.querySelector('#leftHud');
-  const rh = section.querySelector('#rightHud');
-  const half = Math.ceil(remote.players.length / 2);
-  remote.players.slice(0, half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); lh.appendChild(c); });
-  remote.players.slice(half).forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); rh.appendChild(c); });
+  /* All HUD cards on the left; right column is the power-up panel. */
+  remote.players.forEach(p => { const c = buildHudCard(p, match); view.hudByIdx.set(p.idx, c); lh.appendChild(c); });
   buildPowerupRow(section.querySelector('#pupGrid'));
   const boardEl = section.querySelector('#board');
 

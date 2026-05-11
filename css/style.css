@@ -408,10 +408,12 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
 .tile.crate::after{content:"";position:absolute;inset:10px;border:2px dashed rgba(43,33,80,.3);border-radius:6px}
 .tile .label{position:absolute;left:50%;bottom:-22px;transform:translateX(-50%);font-family:'Fredoka';font-size:10px;background:var(--ink);color:#fff;padding:3px 7px;border-radius:6px;white-space:nowrap;z-index:5;font-weight:600}
 
-.pup-row{margin-top:22px;padding:18px;background:#fff;border:3px solid var(--ink);border-radius:20px;box-shadow:0 6px 0 rgba(43,33,80,.16);max-width:100%}
-.pup-row h4{margin:0 0 14px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:16px;color:var(--ink);display:flex;align-items:center;gap:10px}
+.pup-row{padding:14px;background:#fff;border:3px solid var(--ink);border-radius:18px;box-shadow:0 6px 0 rgba(43,33,80,.16);max-width:100%}
+.pup-row h4{margin:0 0 12px;font-family:'Fredoka',sans-serif;font-weight:600;font-size:15px;color:var(--ink);display:flex;align-items:center;gap:8px}
 .pup-row h4 .pip{width:12px;height:12px;background:var(--mint);border:2px solid var(--ink);border-radius:50%}
-.pup-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+/* The pup-row sits inside the right HUD column (~228 px wide).  A single
+   column keeps name + description readable. */
+.pup-grid{display:grid;grid-template-columns:1fr;gap:8px}
 .pup-cell{
   border:2.5px solid var(--ink);border-radius:14px;background:var(--cream);
   padding:10px;display:flex;gap:10px;align-items:center;
@@ -527,41 +529,14 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   .start-btn .ic{width:30px;height:30px}
 
   /* ---- gameplay ---- */
-  .gp{grid-template-columns:1fr;min-height:auto}
-  .gpcol{padding:8px 8px}
-  .gpcol.left,.gpcol.right{
-    border-left:none;border-right:none;
-    border-top:2.5px solid var(--ink);
-    background:rgba(255,255,255,.7);
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
-    gap:8px;
-  }
-  .gpcol.right{border-bottom:2.5px solid var(--ink);border-top:none}
-  /* On mobile we put the board (stage) first so the player can see the
-     action without scrolling.  Both HUD columns live below as compact
-     horizontal grids of player cards. */
-  .gp .stage{order:0}
-  .gp .gpcol.left{order:1}
-  .gp .gpcol.right{order:2}
-  .pcard{margin-bottom:0;padding:8px;border-width:2.5px;border-radius:14px}
-  .pcard .face-sm{width:36px;height:36px}
-  .pcard .face-sm svg{width:44px;height:44px;margin:-4px 0 0 -4px}
-  .pcard .nm{font-size:13px}
-  .pcard .sc{font-size:14px}
-  .pcard .ctrl-row{display:none}
+  /* On phones the stage gets the whole screen: hide both HUD columns
+     AND the power-up reference list. */
+  .gp{grid-template-columns:1fr;min-height:auto;padding-bottom:200px}
+  .gpcol.left,.gpcol.right{display:none}
   .stage{padding:8px 0}
   .topbar{gap:8px;margin-bottom:10px}
   .timer{font-size:30px;padding:6px 14px;border-width:2.5px}
   .round-pill,.live-pill,.end-round{font-size:12px;padding:6px 12px;border-width:2.5px}
-
-  /* The "Powerups" reference panel below the board is purely decorative;
-     hide on phones to save real estate.  Players can see their own pickups
-     in the HUD cards above. */
-  .pup-row{display:none}
-
-  /* Leave clearance for the touch-pad. */
-  .gp{padding-bottom:200px}
 
   /* ---- round end ---- */
   .we{min-height:auto;padding-bottom:18px}
