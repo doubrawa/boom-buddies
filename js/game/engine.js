@@ -12,7 +12,7 @@ import {
   createPickup, pickRandomPickup, applyPickup,
   DROP_CHANCE, SLOW_DURATION,
   MAGNET_RADIUS, MAGNET_STEP_INTERVAL, KICK_STEP_INTERVAL,
-  EARTHQUAKE_DURATION, EARTHQUAKE_INTERVAL, DASH_TILES,
+  EARTHQUAKE_DURATION, EARTHQUAKE_INTERVAL,
 } from './pickups.js';
 import { createCpuController } from './cpu.js';
 
@@ -81,30 +81,6 @@ export function createEngine(lobby, hooks, opts = {}){
     }
   }
 
-  const FACING_DIR = { left:[-1,0], right:[1,0], up:[0,-1], down:[0,1] };
-
-  /* Dash — short forward sprint of DASH_TILES tiles in the player's
-     facing direction.  Passes through bombs but stops at walls, crates,
-     or other players. */
-  function dashForward(player){
-    const dir = FACING_DIR[player.facing] || FACING_DIR.down;
-    const startX = Math.floor(player.x), startY = Math.floor(player.y);
-    let landX = startX, landY = startY;
-    for(let step = 1; step <= DASH_TILES; step++){
-      const nx = startX + dir[0] * step, ny = startY + dir[1] * step;
-      if(field.at(nx, ny) !== TILE.FLOOR) break;
-      let blockedByPlayer = false;
-      for(const o of players){
-        if(o === player || !o.alive) continue;
-        if(playerOnTile(o, nx, ny)){ blockedByPlayer = true; break; }
-      }
-      if(blockedByPlayer) break;
-      landX = nx; landY = ny;
-    }
-    player.x = landX + 0.5;
-    player.y = landY + 0.5;
-  }
-
   /* Earthquake — for the next EARTHQUAKE_DURATION seconds, every
      EARTHQUAKE_INTERVAL we shove each live bomb one tile in a random
      direction (if the destination is free). */
@@ -120,7 +96,6 @@ export function createEngine(lobby, hooks, opts = {}){
     return {
       elapsed,
       slowOthers,
-      dash: dashForward,
       startEarthquake,
     };
   }

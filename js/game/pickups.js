@@ -12,7 +12,7 @@ export const PICKUP_POOL = [
   'bomb', 'bomb', 'fire', 'fire',
   'remote', 'shield', 'ghost', 'slow',
   'kick', 'magnet', 'curse',
-  'confuse', 'dash', 'earthquake',
+  'confuse', 'flash', 'earthquake',
 ];
 
 /* Caps so a runaway match doesn't produce comical superplayers. */
@@ -36,8 +36,9 @@ export const KICK_STEP_INTERVAL = 0.12;
 /* Earthquake: total duration and how often bombs jiggle a tile. */
 export const EARTHQUAKE_DURATION = 3;
 export const EARTHQUAKE_INTERVAL = 0.5;
-/* Dash: how many tiles forward the dash carries the player. */
-export const DASH_TILES = 2;
+/* Flash: temporary super-speed buff (multiplier × base speed, duration). */
+export const FLASH_DURATION = 5;
+export const FLASH_MULTIPLIER = 2;
 /* Confuse: how long (seconds) the picker's own controls are inverted. */
 export const CONFUSE_DURATION = 5;
 
@@ -89,10 +90,10 @@ export function applyPickup(player, type, ctx){
     case 'confuse':
       player.confusedUntil = Math.max(player.confusedUntil || 0, ctx.elapsed + CONFUSE_DURATION);
       break;
-    /* Dash — short forward sprint, passes through bombs but not walls,
-       crates, or other players. */
-    case 'dash':
-      ctx.dash(player);
+    /* Flash — temporary super-speed buff.  Stacks duration if picked
+       up again before expiry. */
+    case 'flash':
+      player.flashUntil = Math.max(player.flashUntil || 0, ctx.elapsed + FLASH_DURATION);
       break;
     /* Earthquake — for the next few seconds every live bomb jiggles one
        tile in a random direction at a fixed cadence. */

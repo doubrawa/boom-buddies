@@ -10,7 +10,7 @@
      center of the perpendicular axis, so they don't get stuck on corners. */
 
 import { TILE } from './field.js';
-import { SLOW_FACTOR } from './pickups.js';
+import { SLOW_FACTOR, FLASH_MULTIPLIER } from './pickups.js';
 
 const HALF = 0.40;          // hitbox half-extent in tiles
 /* Corner-cut: when the player is pressing one axis and gets blocked because
@@ -49,6 +49,7 @@ export function createPlayer(slot, schemeId, charId, controllerType, displayName
     shieldStacks: 0,
     ghostUntil:   0,             // engine-elapsed seconds
     slowUntil:    0,
+    flashUntil:   0,             // super-speed buff while elapsed < this
     confusedUntil:0,             // controls inverted while elapsed < this
     collected:    [],            // types collected this round, for HUD
   };
@@ -72,9 +73,14 @@ export function stepPlayer(p, dx, dy, dt, field, solidBombTiles, elapsed){
     p.facing = dy < 0 ? 'up' : 'down';
   }
 
-  /* Effective speed: half-speed while slowed. */
-  const slowed = elapsed != null && elapsed < p.slowUntil;
-  const speed = slowed ? p.speed * SLOW_FACTOR : p.speed;
+  /* Effective speed: slow and flash buffs both multiply.  Picking up
+     flash while slowed therefore mostly cancels the slow (≈ 0.8 × base)
+     instead of fully overriding either way. */
+  const slowed   = elapsed != null && elapsed < p.slowUntil;
+  const flashing = elapsed != null && elapsed < p.flashUntil;
+  let speed = p.speed;
+  if(slowed)   speed *= SLOW_FACTOR;
+  if(flashing) speed *= FLASH_MULTIPLIER;
   /* While ghosted: walls and boxes don't block.  Bombs still block (you can
      glide through walls but not through your own ticking explosives). */
   const ghosting = elapsed != null && elapsed < p.ghostUntil;
