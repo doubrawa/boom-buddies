@@ -423,6 +423,12 @@ export function createEngine(lobby, hooks, opts = {}){
       explosions.push({ segments: segs, ttl: EXPLOSION_TTL });
       pendingEvents.push({ type: 'bombDetonated', bomb: b, segments: segs });
 
+      /* Each player can be hit AT MOST ONCE by this bomb's blast — a
+         body straddling two segment tiles must not eat two shield
+         stacks (or burn through a shield and then die on the second
+         segment). */
+      const hitThisBomb = new Set();
+
       for(const s of segs){
         /* Step 1: burn any pre-existing pickup on this tile (before we
            potentially drop a fresh one as a result of breaking a box). */
@@ -456,11 +462,13 @@ export function createEngine(lobby, hooks, opts = {}){
         }
         for(const p of players){
           if(!p.alive) continue;
+          if(hitThisBomb.has(p.idx)) continue;
           /* Use tolerance-aware hit test: a sprite that just barely
              grazes a blast tile (≤ 25 % of body extent into the tile)
              survives.  This forgives slight off-centre positions during
              corner turns. */
           if(playerHitByBlast(p, s.x, s.y)){
+            hitThisBomb.add(p.idx);
             /* Shield absorbs one full hit before death. */
             if(p.shieldStacks > 0){
               p.shieldStacks -= 1;
