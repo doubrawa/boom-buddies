@@ -58,39 +58,34 @@ export function render(ctx){
         <div class="pgrid" id="pgrid"></div>
       </div>
 
-      <div class="twocol">
-        <div class="panel">
-          <div class="panel-h"><span class="pip" style="background:var(--peach)"></span>Goodie Drops</div>
-          <div class="opt-lbl">How often crates drop power-ups</div>
-          <div class="slider-wrap">
-            <div class="slider" data-slider="goodies"><div class="fill" style="width:${['33%','62%','85%'][state.goodieFreq]}"></div></div>
-            <div class="slider-ticks"><span>Sparse</span><span>Normal</span><span>Generous</span></div>
-          </div>
-          <div data-goodie-readout style="font-size:12px;color:var(--mid);margin-top:14px;font-weight:700"></div>
+      <div class="panel">
+        <div class="panel-h"><span class="pip" style="background:var(--lav)"></span>Rules</div>
+        <div class="opt-lbl">Best of</div>
+        <div class="seg-row" data-seg="rounds">
+          <span data-val="1" class="${state.rounds===1?'on':''}">1</span>
+          <span data-val="3" class="${state.rounds===3?'on':''}">3</span>
+          <span data-val="5" class="${state.rounds===5?'on':''}">5</span>
+          <span data-val="7" class="${state.rounds===7?'on':''}">7</span>
         </div>
-        <div class="panel">
-          <div class="panel-h"><span class="pip" style="background:var(--lav)"></span>Round Rules</div>
-          <div class="opt-lbl">Best of</div>
-          <div class="seg-row" data-seg="rounds">
-            <span data-val="1" class="${state.rounds===1?'on':''}">1</span>
-            <span data-val="3" class="${state.rounds===3?'on':''}">3</span>
-            <span data-val="5" class="${state.rounds===5?'on':''}">5</span>
-            <span data-val="7" class="${state.rounds===7?'on':''}">7</span>
-          </div>
-          <div class="opt-lbl">Time limit</div>
-          <div class="seg-row" data-seg="time">
-            <span data-val="90"  class="${state.timeLimit===90?'on':''}">1:30</span>
-            <span data-val="150" class="${state.timeLimit===150?'on':''}">2:30</span>
-            <span data-val="210" class="${state.timeLimit===210?'on':''}">3:30</span>
-            <span data-val="0"   class="${state.timeLimit===0?'on':''}">∞</span>
-          </div>
-          <div class="opt-lbl">Speed</div>
-          <div class="seg-row" data-seg="speed">
-            <span data-val="slow"   class="${state.speed==='slow'?'on':''}">Slow</span>
-            <span data-val="normal" class="${state.speed==='normal'?'on':''}">Normal</span>
-            <span data-val="fast"   class="${state.speed==='fast'?'on':''}">Fast</span>
-          </div>
+        <div class="opt-lbl">Time limit</div>
+        <div class="seg-row" data-seg="time">
+          <span data-val="90"  class="${state.timeLimit===90?'on':''}">1:30</span>
+          <span data-val="150" class="${state.timeLimit===150?'on':''}">2:30</span>
+          <span data-val="210" class="${state.timeLimit===210?'on':''}">3:30</span>
+          <span data-val="0"   class="${state.timeLimit===0?'on':''}">∞</span>
         </div>
+        <div class="opt-lbl">Speed</div>
+        <div class="seg-row" data-seg="speed">
+          <span data-val="slow"   class="${state.speed==='slow'?'on':''}">Slow</span>
+          <span data-val="normal" class="${state.speed==='normal'?'on':''}">Normal</span>
+          <span data-val="fast"   class="${state.speed==='fast'?'on':''}">Fast</span>
+        </div>
+        <div class="opt-lbl">Goodie drops</div>
+        <div class="slider-wrap">
+          <div class="slider" data-slider="goodies"><div class="fill" style="width:${['33%','62%','85%'][state.goodieFreq]}"></div></div>
+          <div class="slider-ticks"><span>Sparse</span><span>Normal</span><span>Generous</span></div>
+        </div>
+        <div data-goodie-readout style="font-size:12px;color:var(--mid);margin-top:10px;font-weight:700"></div>
       </div>
 
       <button class="start-btn" data-action="start">
