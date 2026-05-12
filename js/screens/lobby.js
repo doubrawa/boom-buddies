@@ -60,32 +60,38 @@ export function render(ctx){
 
       <div class="panel">
         <div class="panel-h"><span class="pip" style="background:var(--lav)"></span>Rules</div>
-        <div class="opt-lbl">Best of</div>
-        <div class="seg-row" data-seg="rounds">
-          <span data-val="1" class="${state.rounds===1?'on':''}">1</span>
-          <span data-val="3" class="${state.rounds===3?'on':''}">3</span>
-          <span data-val="5" class="${state.rounds===5?'on':''}">5</span>
-          <span data-val="7" class="${state.rounds===7?'on':''}">7</span>
+        <div class="twocol">
+          <div>
+            <div class="opt-lbl">Best of</div>
+            <div class="seg-row" data-seg="rounds">
+              <span data-val="1" class="${state.rounds===1?'on':''}">1</span>
+              <span data-val="3" class="${state.rounds===3?'on':''}">3</span>
+              <span data-val="5" class="${state.rounds===5?'on':''}">5</span>
+              <span data-val="7" class="${state.rounds===7?'on':''}">7</span>
+            </div>
+            <div class="opt-lbl">Speed</div>
+            <div class="seg-row" data-seg="speed">
+              <span data-val="slow"   class="${state.speed==='slow'?'on':''}">Slow</span>
+              <span data-val="normal" class="${state.speed==='normal'?'on':''}">Normal</span>
+              <span data-val="fast"   class="${state.speed==='fast'?'on':''}">Fast</span>
+            </div>
+          </div>
+          <div>
+            <div class="opt-lbl">Time limit</div>
+            <div class="seg-row" data-seg="time">
+              <span data-val="90"  class="${state.timeLimit===90?'on':''}">1:30</span>
+              <span data-val="150" class="${state.timeLimit===150?'on':''}">2:30</span>
+              <span data-val="210" class="${state.timeLimit===210?'on':''}">3:30</span>
+              <span data-val="0"   class="${state.timeLimit===0?'on':''}">∞</span>
+            </div>
+            <div class="opt-lbl">Goodie drops</div>
+            <div class="seg-row" data-seg="goodies">
+              <span data-val="0" class="${state.goodieFreq===0?'on':''}">Sparse</span>
+              <span data-val="1" class="${state.goodieFreq===1?'on':''}">Normal</span>
+              <span data-val="2" class="${state.goodieFreq===2?'on':''}">Generous</span>
+            </div>
+          </div>
         </div>
-        <div class="opt-lbl">Time limit</div>
-        <div class="seg-row" data-seg="time">
-          <span data-val="90"  class="${state.timeLimit===90?'on':''}">1:30</span>
-          <span data-val="150" class="${state.timeLimit===150?'on':''}">2:30</span>
-          <span data-val="210" class="${state.timeLimit===210?'on':''}">3:30</span>
-          <span data-val="0"   class="${state.timeLimit===0?'on':''}">∞</span>
-        </div>
-        <div class="opt-lbl">Speed</div>
-        <div class="seg-row" data-seg="speed">
-          <span data-val="slow"   class="${state.speed==='slow'?'on':''}">Slow</span>
-          <span data-val="normal" class="${state.speed==='normal'?'on':''}">Normal</span>
-          <span data-val="fast"   class="${state.speed==='fast'?'on':''}">Fast</span>
-        </div>
-        <div class="opt-lbl">Goodie drops</div>
-        <div class="slider-wrap">
-          <div class="slider" data-slider="goodies"><div class="fill" style="width:${['33%','62%','85%'][state.goodieFreq]}"></div></div>
-          <div class="slider-ticks"><span>Sparse</span><span>Normal</span><span>Generous</span></div>
-        </div>
-        <div data-goodie-readout style="font-size:12px;color:var(--mid);margin-top:10px;font-weight:700"></div>
       </div>
 
       <button class="start-btn" data-action="start">
@@ -103,9 +109,6 @@ export function render(ctx){
   buildSlots(section.querySelector('#pgrid'), state);
   updateRosterCount(section, state);
 
-  /* Goodie readout. */
-  updateGoodieReadout(section, state);
-
   /* Slot icons. */
   section.querySelectorAll('[data-spr="ico-play"]').forEach(el => {
     el.appendChild(icoSvg('play', 20));
@@ -120,22 +123,12 @@ export function render(ctx){
         const key = g.getAttribute('data-seg');
         const raw = s.getAttribute('data-val');
         const val = isNaN(parseInt(raw, 10)) ? raw : parseInt(raw, 10);
-        if(key === 'rounds') state.rounds = val;
-        if(key === 'time')   state.timeLimit = val;
-        if(key === 'speed')  state.speed = val;
+        if(key === 'rounds')  state.rounds = val;
+        if(key === 'time')    state.timeLimit = val;
+        if(key === 'speed')   state.speed = val;
+        if(key === 'goodies') state.goodieFreq = val;
       });
     });
-  });
-
-  /* Goodie slider. */
-  const slider = section.querySelector('[data-slider="goodies"]');
-  slider.addEventListener('click', (e) => {
-    const r = slider.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const step = x < 0.34 ? 0 : (x < 0.67 ? 1 : 2);
-    state.goodieFreq = step;
-    slider.querySelector('.fill').style.width = ['33%','62%','85%'][step];
-    updateGoodieReadout(section, state);
   });
 
   /* Nav. */
@@ -238,13 +231,6 @@ function activeCount(state){
 function updateRosterCount(scope, state){
   const el = scope.querySelector?.('[data-roster-count]') || document.querySelector('[data-roster-count]');
   if(el) el.textContent = `${activeCount(state)}/8 active`;
-}
-
-function updateGoodieReadout(scope, state){
-  const el = scope.querySelector('[data-goodie-readout]');
-  if(!el) return;
-  const labels = ['Sparse — about 1 in 6 crates carries a treat.', 'Normal — about 1 in 3 crates carries a treat.', 'Generous — about 1 in 2 crates carries a treat.'];
-  el.innerHTML = `Currently: <b style="color:var(--ink)">${['Sparse','Normal','Generous'][state.goodieFreq]}</b> — ${labels[state.goodieFreq].split('—')[1].trim()}`;
 }
 
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
