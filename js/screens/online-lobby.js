@@ -69,23 +69,39 @@ export function render(ctx){
        via closure so they pick up the value once it's set. */
     let host = null;
 
-    /* If the guest's reported charId collides with the host's choice or
-       another guest's, reassign it to the first free buddy.  When we
-       reassign, send the guest a MSG_PICK echo so their local state
-       (ctx.net.charId) lines up with what we'll use at match start. */
-    function dedupeGuestChar(guest){
+    /* The host assigns each joining guest a buddy and a unique display
+       name.  Whatever charId the guest reported is ignored — we always
+       pick the first unused buddy ourselves.  If the requested name is
+       already in use, suffix it with " (2)", " (3)", etc.  When the
+       assignment differs from what the client sent, echo MSG_PICK back
+       so the client's local state mirrors ours. */
+    function assignGuestIdentity(guest){
       if(!host) return;
-      const taken = new Set([ctx.lobby.players[0].id]);
+      const me = ctx.lobby.players[0];
+
+      const takenChars = new Set([me.id]);
       for(const g of host.guests.values()){
         if(g === guest) continue;
-        if(g.charId) taken.add(g.charId);
+        if(g.charId) takenChars.add(g.charId);
       }
-      if(!guest.charId || taken.has(guest.charId)){
-        const replacement = pickAvailableForGuest(taken);
-        if(replacement !== guest.charId){
-          guest.charId = replacement;
-          host.sendTo(guest, { t: MSG_PICK, charId: replacement });
-        }
+      const newChar = pickAvailableForGuest(takenChars);
+
+      const takenNames = new Set([me.name]);
+      for(const g of host.guests.values()){
+        if(g === guest) continue;
+        if(g.name) takenNames.add(g.name);
+      }
+      const base = ((guest.name || 'Buddy').trim()) || 'Buddy';
+      let newName = base;
+      let suffix = 2;
+      while(takenNames.has(newName)) newName = `${base} (${suffix++})`;
+
+      const charChanged = newChar !== guest.charId;
+      const nameChanged = newName !== guest.name;
+      guest.charId = newChar;
+      guest.name = newName;
+      if(charChanged || nameChanged){
+        host.sendTo(guest, { t: MSG_PICK, charId: newChar, name: newName });
       }
     }
 
@@ -115,7 +131,7 @@ export function render(ctx){
         onGuestDisconnect: () => { refreshHostUi(); broadcastLobby(); },
         onMessage: (guest, msg) => {
           if(msg.t === MSG_JOIN || msg.t === MSG_PICK){
-            dedupeGuestChar(guest);
+            assignGuestIdentity(guest);
             refreshHostUi();
             broadcastLobby();
           }
@@ -271,12 +287,16 @@ function handleClientMessage(ctx, section, msg){
     ctx.net.myIdx = msg.idx;
     ctx.net.matchLobby = msg.lobby;
   } else if(msg.t === MSG_PICK){
-    /* Host reassigned our character because someone else already had it
-       picked.  Sync local state so the next lobby refresh shows us as
-       the new buddy. */
+    /* Host reassigned our character and/or name to keep the room
+       unique.  Sync local state so the next lobby refresh shows us
+       under the new identity. */
     if(msg.charId){
       ctx.net.charId = msg.charId;
       if(ctx.lobby?.players?.[0]) ctx.lobby.players[0].id = msg.charId;
+    }
+    if(msg.name){
+      ctx.net.name = msg.name;
+      if(ctx.lobby?.players?.[0]) ctx.lobby.players[0].name = msg.name;
     }
   } else if(msg.t === MSG_LOBBY){
     ctx.net.matchLobby = msg.state || msg.lobby;
