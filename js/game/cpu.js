@@ -103,30 +103,6 @@ export function createCpuController(level = 'nice'){
         }
       }
 
-      /* ── UNSTACK ──────────────────────────────────────────────────────
-         Two CPUs that end up on the same tile run identical logic on
-         identical state and circle the field together forever.  When we
-         spot another live player on our tile, force a separation: walk
-         in an idx-preferred cardinal direction (different per player so
-         the stacked pair pick different exits).  Survival reflex above
-         still wins — when both are in real danger we let the flee plan
-         carry us, even if it briefly keeps the stack. */
-      const stackedWith = view.players.find(p =>
-        p.idx !== me.idx && p.alive &&
-        Math.floor(p.x) === myTx && Math.floor(p.y) === myTy
-      );
-      if(stackedWith){
-        for(let k = 0; k < CARDINALS.length; k++){
-          const [dx, dy] = CARDINALS[(me.idx + k) % CARDINALS.length];
-          const nx = myTx + dx, ny = myTy + dy;
-          if(!isPassable(view, me, nx, ny)) continue;
-          const blastT = danger.get(nx + ',' + ny);
-          if(blastT !== undefined && blastT < 2.0) continue;
-          route = null; stepIdx = 0;
-          return walkToward(me, { x: nx, y: ny });
-        }
-      }
-
       /* ── STUCK DETECTION ──────────────────────────────────────────────
          If we haven't moved a meaningful amount for STUCK_TICKS_MAX ticks
          (e.g. another CPU dropped a bomb in our path), drop the route and
