@@ -41,8 +41,17 @@ export function createEngine(lobby, hooks, opts = {}){
     const slot = { idx: i, x: spawn[0], y: spawn[1] };
     /* Scheme is bound to the slot's active position (matches lobby.js).
        Toggling a slot from human to CPU keeps later humans' bindings
-       intact — their schemes don't shift up. */
-    const scheme = cfg.mode === 'human' ? (HUMAN_SCHEMES[i] || null) : null;
+       intact — their schemes don't shift up.  A custom rebind on the
+       slot (cfg.bindings) wins over the preset. */
+    let scheme = null;
+    if(cfg.mode === 'human'){
+      if(cfg.bindings){
+        scheme = cfg.bindings;
+      } else {
+        const presetName = HUMAN_SCHEMES[i];
+        scheme = presetName ? CONTROL_SCHEMES[presetName] : null;
+      }
+    }
     players.push(createPlayer(slot, scheme, cfg.id, cfg.mode, cfg.name, baseSpeed));
     if(cfg.mode === 'cpu'){
       /* First CPU per match is "nice", later ones get "mean" — keeps things

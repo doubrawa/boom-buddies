@@ -1,4 +1,5 @@
 import { charSvg, icoSvg, CHAR_IDS, CHARS } from '../sprites.js';
+import { CONTROL_SCHEMES } from '../game/input.js';
 
 const FIELD_SIZES = [
   { id:'small',  w:11, h:9,  label:'Cozy',    meta:['~2 min rounds', '2–3 buddies'] },
@@ -6,15 +7,29 @@ const FIELD_SIZES = [
   { id:'large',  w:19, h:17, label:'Chaos',   meta:['~5 min rounds', '6–8 buddies'] },
 ];
 
-const SCHEME_KEYS = {
-  wasd:   { move: 'WASD',  bomb: '␣' },
-  arrows: { move: '↑↓←→', bomb: '⏎' },
-  ijkl:   { move: 'IJKL',  bomb: 'U' },
-  numpad: { move: '8456',  bomb: '0' },
-};
-
 /* Slot-index → preferred control scheme for human players. */
 const HUMAN_SCHEME_ORDER = ['wasd', 'arrows', 'ijkl', 'numpad'];
+
+const REBIND_GLYPH = { up:'↑', down:'↓', left:'←', right:'→', bomb:'💣' };
+
+/* Pretty short labels for KeyboardEvent.code values shown on the lobby
+   key chips. */
+function formatKeyCode(code){
+  if(!code) return '?';
+  const map = {
+    Space: '␣', Enter: '⏎', Tab: '⇥', Escape: 'Esc', Backspace: '⌫',
+    ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→',
+    ShiftLeft: '⇧L', ShiftRight: '⇧R',
+    ControlLeft: '⌃L', ControlRight: '⌃R',
+    AltLeft: '⌥L', AltRight: '⌥R',
+    MetaLeft: '⌘L', MetaRight: '⌘R',
+  };
+  if(map[code]) return map[code];
+  if(code.startsWith('Key'))    return code.slice(3);
+  if(code.startsWith('Digit'))  return code.slice(5);
+  if(code.startsWith('Numpad')) return 'N' + code.slice(6);
+  return code;
+}
 
 const DEFAULT_NAMES = ['Mochi', 'Bubble', 'Biscuit', 'Pickle', 'Plum', 'Sage', 'Daisy', 'Cocoa'];
 const DEFAULT_MODES = ['human', 'human', 'cpu', 'cpu', 'cpu', 'cpu', 'off', 'off'];
@@ -165,10 +180,15 @@ function buildSlots(host, state){
     const slot = document.createElement('div');
     slot.className = 'pslot ' + (p.mode === 'off' ? 'empty' : (p.mode === 'cpu' ? 'cpu' : ''));
     slot.dataset.idx = i;
-    const scheme = humanSchemeFor(state, i);
-    const ctrlInner = p.mode === 'human'
-      ? `<span class="key">${SCHEME_KEYS[scheme].move}</span><span class="key">${SCHEME_KEYS[scheme].bomb}</span><span class="lbl">move + bomb</span>`
-      : (p.mode === 'cpu' ? `<span class="lbl">A CPU buddy. We'll wire its brain in Etappe 6.</span>` : `<span class="lbl">tap a tab to add</span>`);
+    const bindings = getBindings(state, i);
+    const ctrlInner = p.mode === 'human' && bindings
+      ? (
+          ['up','down','left','right','bomb']
+            .map(k => `<span class="key" data-rebind="${k}" title="Click to rebind">${REBIND_GLYPH[k]}${formatKeyCode(bindings[k])}</span>`)
+            .join('')
+          + `<span class="lbl">click a key to rebind</span>`
+        )
+      : (p.mode === 'cpu' ? `<span class="lbl">A CPU buddy.</span>` : `<span class="lbl">tap a tab to add</span>`);
     const topLabel = p.mode === 'off' ? 'EMPTY' : (p.mode === 'cpu' ? 'CPU' : 'HUMAN');
 
     slot.innerHTML = `
@@ -206,7 +226,67 @@ function buildSlots(host, state){
         if(lobbyHost) updateRosterCount(lobbyHost, state);
       });
     });
+
+    /* Key rebinding — clicking any chip puts the slot in capture mode
+       and the next keypress becomes the new binding for that action. */
+    slot.querySelectorAll('[data-rebind]').forEach(chip => {
+      chip.addEventListener('click', () => beginRebind(host, state, i, chip.getAttribute('data-rebind')));
+    });
   });
+}
+
+/* Returns the effective bindings for slot `i`, falling back to the slot's
+   preset scheme when the user hasn't rebound anything yet. */
+function getBindings(state, i){
+  const p = state.players[i];
+  if(!p || p.mode !== 'human') return null;
+  if(p.bindings) return p.bindings;
+  const scheme = humanSchemeFor(state, i);
+  return scheme ? { ...CONTROL_SCHEMES[scheme] } : null;
+}
+
+let activeRebind = null;   // closes the previous capture if user starts a new one
+
+function beginRebind(host, state, i, action){
+  if(activeRebind) activeRebind.cancel();
+  const slot = host.querySelector(`.pslot[data-idx="${i}"]`);
+  if(!slot) return;
+  const chip = slot.querySelector(`[data-rebind="${action}"]`);
+  if(!chip) return;
+  const originalHTML = chip.innerHTML;
+  chip.classList.add('rebinding');
+  chip.innerHTML = `${REBIND_GLYPH[action]}…`;
+
+  const cleanup = () => {
+    window.removeEventListener('keydown', onKey, true);
+    activeRebind = null;
+  };
+
+  function onKey(e){
+    if(e.code === 'Escape'){
+      e.preventDefault();
+      chip.classList.remove('rebinding');
+      chip.innerHTML = originalHTML;
+      cleanup();
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    /* Persist the new binding on the slot.  Start from the current
+       effective bindings so the other 4 actions stay intact. */
+    const current = state.players[i].bindings || (() => {
+      const scheme = humanSchemeFor(state, i);
+      return scheme ? { ...CONTROL_SCHEMES[scheme] } : { up:null, down:null, left:null, right:null, bomb:null };
+    })();
+    current[action] = e.code;
+    state.players[i].bindings = current;
+    chip.classList.remove('rebinding');
+    chip.innerHTML = `${REBIND_GLYPH[action]}${formatKeyCode(e.code)}`;
+    cleanup();
+  }
+
+  activeRebind = { cancel: () => { chip.classList.remove('rebinding'); chip.innerHTML = originalHTML; cleanup(); } };
+  window.addEventListener('keydown', onKey, true);
 }
 
 /* Scheme is bound to the slot's *active* position so toggling human → cpu

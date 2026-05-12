@@ -299,7 +299,9 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
 .pslot .av .face svg{width:74px;height:74px;margin-top:6px}
 .pslot .nm{flex:1;font-family:'Fredoka',sans-serif;font-weight:600;font-size:18px;background:var(--cream);border:2.5px solid var(--ink);border-radius:12px;padding:8px 10px;color:var(--ink);min-width:0;width:100%}
 .pslot .ctrl{margin-top:10px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.pslot .ctrl .key{font-size:10px;background:var(--peach);border:2px solid var(--ink);border-radius:8px;padding:4px 8px;font-weight:800;color:var(--ink)}
+.pslot .ctrl .key{font-size:10px;background:var(--peach);border:2px solid var(--ink);border-radius:8px;padding:4px 8px;font-weight:800;color:var(--ink);cursor:pointer;user-select:none}
+.pslot .ctrl .key[data-rebind]:hover{background:var(--butter)}
+.pslot .ctrl .key.rebinding{background:var(--hot);color:#fff;animation:pulse .6s ease-in-out infinite}
 .pslot .ctrl .lbl{font-size:11px;color:var(--mid);font-weight:700}
 .pslot .seg{display:flex;gap:0;margin-top:10px;border:2.5px solid var(--ink);border-radius:999px;width:fit-content;background:#fff;overflow:hidden}
 .pslot .seg span{font-size:11px;padding:6px 11px;cursor:pointer;font-weight:800;color:var(--ink2)}

@@ -55,11 +55,6 @@ export function render(ctx){
           ONLINE MULTIPLAYER
           <span class="arr">›</span>
         </button>
-        <button class="pillbtn" data-action="settings">
-          <span class="ic" data-spr="ico-cog" data-size="18"></span>
-          SETTINGS
-          <span class="arr">›</span>
-        </button>
         <button class="pillbtn" data-action="highscores">
           <span class="ic" data-spr="ico-cup" data-size="18"></span>
           HIGHSCORES
@@ -111,7 +106,6 @@ export function render(ctx){
       const a = btn.getAttribute('data-action');
       if(a === 'play' || a === 'local-mp') navigate('lobby');
       else if(a === 'online-mp') navigate('online-lobby');
-      else if(a === 'settings') alert('Settings — coming soon');
       else if(a === 'highscores') alert('Highscores — coming soon');
     });
   });

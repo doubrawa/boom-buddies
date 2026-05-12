@@ -33,10 +33,12 @@ export function createInput(){
   window.addEventListener('blur', blur);
 
   return {
-    /* Returns axis vector for a given control scheme, plus bomb-edge flag.
-       dx,dy each in {-1,0,1}.  bombEdge true on the frame the bomb key is first held. */
-    read(scheme, prevBomb){
-      const c = CONTROL_SCHEMES[scheme];
+    /* Returns axis vector for the given control source plus bomb-edge flag.
+       The source can be either a preset name in CONTROL_SCHEMES (string)
+       or a bindings object {up, down, left, right, bomb} directly — the
+       lobby uses the latter when a player has rebound their keys. */
+    read(source, prevBomb){
+      const c = (typeof source === 'string') ? CONTROL_SCHEMES[source] : source;
       if(!c) return { dx:0, dy:0, bomb:false, bombEdge:false };
       const dx = (pressed.has(c.left) ? -1 : 0) + (pressed.has(c.right) ? 1 : 0);
       const dy = (pressed.has(c.up)   ? -1 : 0) + (pressed.has(c.down)  ? 1 : 0);
