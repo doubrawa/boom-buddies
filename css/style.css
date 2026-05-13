@@ -539,13 +539,14 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   .timer{font-size:26px;padding:5px 12px;border-width:2.5px}
   .timer .dot{width:9px;height:9px}
   .round-pill,.live-pill,.end-round{font-size:11px;padding:5px 10px;border-width:2.5px}
-  /* The touch-pad is now a child of .stage and contains only the BOMB
-     button.  Override the default position:fixed + grid layout from the
-     base touch-device rule. */
+  /* On the gameplay screen the touch-pad sits inline beneath the board
+     instead of being pinned to the viewport bottom.  Visibility is NOT
+     forced here — display stays inherited from the (hover:none) and
+     (pointer:coarse) touch-only rule, so a desktop browser resized
+     below 900px keeps the touch-pad hidden. */
   .screen.gp-screen .touch-pad{
     position:static;
-    display:flex;justify-content:center;align-items:center;
-    grid-template-columns:none;
+    justify-content:center;align-items:center;
     padding:6px 12px env(safe-area-inset-bottom, 6px);
     flex:none;
     gap:0;
