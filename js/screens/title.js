@@ -41,11 +41,6 @@ export function render(ctx){
           PLAY
           <span class="arr">›</span>
         </button>
-        <button class="pillbtn" data-action="local-mp">
-          <span class="ic" data-spr="ico-mp" data-size="20"></span>
-          LOCAL MULTIPLAYER
-          <span class="arr">›</span>
-        </button>
         <button class="pillbtn" data-action="online-mp">
           <span class="ic" data-spr="ico-net" data-size="18"></span>
           ONLINE MULTIPLAYER
@@ -100,7 +95,7 @@ export function render(ctx){
   section.querySelectorAll('[data-action]').forEach(btn => {
     btn.addEventListener('click', () => {
       const a = btn.getAttribute('data-action');
-      if(a === 'play' || a === 'local-mp') navigate('lobby');
+      if(a === 'play') navigate('lobby');
       else if(a === 'online-mp') navigate('online-lobby');
       else if(a === 'highscores') alert('Highscores — coming soon');
     });
