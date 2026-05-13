@@ -293,6 +293,11 @@ function attachScreenControls(section){
     /* Bomb button keeps its own handler — leave touches that start on
        it alone so the existing keydown('Space') logic fires there. */
     if(touchPad && touchPad.contains(e.target)) return;
+    /* Don't swallow clicks on UI controls (Forfeit, etc.) — the
+       section-level preventDefault below would suppress their click
+       event otherwise.  Buttons and explicit data-action elements get
+       their own click handlers, so we just step aside. */
+    if(e.target.closest('button, a, input, select, [data-action]')) return;
     e.preventDefault();
     if(pointerId !== null) return;     // single-finger movement
     pointerId = e.pointerId;
