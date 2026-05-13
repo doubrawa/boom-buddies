@@ -113,6 +113,7 @@ function renderHostOrLocal(ctx){
       renderBombs(view, engine.bombs);
       renderExplosions(view, engine.explosions);
       renderPickups(view, engine.pickups);
+      refreshTimedPups(view, engine);
     },
     onRoundEnd: (result) => scheduleRoundEnd(ctx, result, isHost),
   }, {
@@ -457,6 +458,7 @@ function handleClientNetMsg(m, ctx, view, remote, boardEl, section){
     renderBombs(view, remote.bombs);
     renderExplosions(view, remote.explosions);
     renderPickups(view, remote.pickups);
+    refreshTimedPups(view, remote);
   } else if(m.t === MSG_EVENTS){
     /* Forward to existing event handler. */
     handleEvents(m.events, view, remote);
@@ -506,9 +508,17 @@ function createRemoteGame(lobby){
         if(!p) continue;
         p.x = wp.x; p.y = wp.y;
         p.alive = !!wp.a;
-        p.ghostUntil = wp.g ? this.elapsed + 1 : 0;
-        p.slowUntil  = wp.s ? this.elapsed + 1 : 0;
-        p.shieldStacks = wp.sh ? 1 : 0;
+        /* Mirror the host's timed-effect timestamps so HUD chip pruning
+           and per-player visual filters work the same way on both
+           sides.  Falls back to the old g/s/sh flags for compatibility
+           with older host builds. */
+        p.ghostUntil    = wp.gU != null ? wp.gU : (wp.g  ? this.elapsed + 1 : 0);
+        p.slowUntil     = wp.sU != null ? wp.sU : (wp.s  ? this.elapsed + 1 : 0);
+        p.kickUntil     = wp.kU || 0;
+        p.magnetUntil   = wp.mU || 0;
+        p.confusedUntil = wp.cU || 0;
+        p.flashUntil    = wp.fU || 0;
+        p.shieldStacks  = wp.ss != null ? wp.ss : (wp.sh ? 1 : 0);
       }
       this.bombs.length = 0;
       for(const b of snap.b || []){
@@ -756,6 +766,43 @@ function makeSpriteHolder(size){
   return div;
 }
 
+/* Walks every player HUD card's pickup-chip list and prunes chips for
+   timed effects that have expired.  Source is the engine (host) or the
+   remote-game stub (client) — both expose .players[] with
+   ghostUntil / kickUntil / magnetUntil / confusedUntil / flashUntil
+   and .elapsed, after MSG_STATE is applied. */
+function refreshTimedPups(view, source){
+  if(!view?.hudByIdx || !source?.players) return;
+  const elapsed = source.elapsed || 0;
+  for(const p of source.players){
+    const card = view.hudByIdx.get(p.idx);
+    if(!card) continue;
+    const pups = card.querySelector('[data-pups]');
+    if(!pups) continue;
+    let shieldChipsSeen = 0;
+    /* Copy NodeList so we can mutate during iteration. */
+    const chips = Array.from(pups.querySelectorAll('.pup'));
+    for(const chip of chips){
+      const type = chip.dataset.pupType;
+      let alive = true;
+      if(type === 'ghost')   alive = elapsed < (p.ghostUntil    || 0);
+      else if(type === 'kick')    alive = elapsed < (p.kickUntil     || 0);
+      else if(type === 'magnet')  alive = elapsed < (p.magnetUntil   || 0);
+      else if(type === 'confuse') alive = elapsed < (p.confusedUntil || 0);
+      else if(type === 'flash')   alive = elapsed < (p.flashUntil    || 0);
+      else if(type === 'shield'){
+        shieldChipsSeen++;
+        alive = shieldChipsSeen <= (p.shieldStacks || 0);
+      } else if(chip.dataset.pupUntil){
+        alive = elapsed < parseFloat(chip.dataset.pupUntil);
+      }
+      /* Permanent pickups (bomb, fire, remote, …) carry no expiry
+         attribute and no timed-state field — they stay. */
+      if(!alive) chip.remove();
+    }
+  }
+}
+
 /* ============ EVENTS ============ */
 
 function handleEvents(events, view, engine){
@@ -804,6 +851,12 @@ function handleEvents(events, view, engine){
           const meta = PUPS[ev.pickup.type] || PUPS.bomb;
           const slot = document.createElement('span');
           slot.className = 'pup';
+          slot.dataset.pupType = ev.pickup.type;
+          /* Slow / earthquake are one-shot effects on the picker —
+             no lasting buff, so we just leave the chip up briefly. */
+          if(ev.pickup.type === 'slow' || ev.pickup.type === 'earthquake'){
+            slot.dataset.pupUntil = String((engine?.elapsed ?? 0) + 3);
+          }
           slot.style.background = meta.bg;
           slot.appendChild(pupSvg(ev.pickup.type, 18));
           pups.appendChild(slot);

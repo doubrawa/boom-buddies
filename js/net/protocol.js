@@ -88,9 +88,15 @@ export function encodeState(engine){
       x: +p.x.toFixed(3),
       y: +p.y.toFixed(3),
       a: p.alive ? 1 : 0,
-      g: e < (p.ghostUntil || 0) ? 1 : 0,
-      s: e < (p.slowUntil || 0) ? 1 : 0,
-      sh: (p.shieldStacks || 0) > 0 ? 1 : 0,
+      /* Timed-effect expiry timestamps so the client can drive its own
+         HUD/visual-filter logic instead of receiving a coarse boolean. */
+      gU: +(p.ghostUntil    || 0).toFixed(2),
+      sU: +(p.slowUntil     || 0).toFixed(2),
+      kU: +(p.kickUntil     || 0).toFixed(2),
+      mU: +(p.magnetUntil   || 0).toFixed(2),
+      cU: +(p.confusedUntil || 0).toFixed(2),
+      fU: +(p.flashUntil    || 0).toFixed(2),
+      ss: p.shieldStacks || 0,
     })),
     b: engine.bombs.map(b => ({
       i: b.id,
