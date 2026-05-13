@@ -19,7 +19,11 @@ import { createCpuController } from './cpu.js';
 const HUMAN_SCHEMES = ['wasd', 'arrows', 'ijkl', 'numpad'];
 /* Lobby-level speed setting applied uniformly to every player. */
 const SPEED_FACTORS = { slow: 0.7, normal: 1.0, fast: 1.5 };
-const BASE_SPEED = 4.5;
+/* Base player speed (tiles per second).  Reduced 30 % from the previous
+   4.5 so the overall pace is calmer; the lobby slow/normal/fast
+   multipliers above are unchanged so the relative gear shifts feel the
+   same. */
+const BASE_SPEED = 3.15;
 /* In the last N seconds of a timed round the field fills up with pillars
    from the top-left in row-major order — anyone caught on the cell as it
    converts dies.  Only applies when the lobby has set a finite timeLimit. */

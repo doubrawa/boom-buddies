@@ -626,9 +626,10 @@ function renderBombs(view, bombs){
     if(!entry){
       const wrap = makePosWrapper();
       /* Smooth tile-to-tile slide when the engine teleports the bomb during
-         a kick.  No animation if it just sits — it never gets a different
-         tile from one render to the next. */
-      wrap.style.transition = 'transform 0.12s linear';
+         a kick.  Duration matches KICK_STEP_INTERVAL (pickups.js) so the
+         bomb is still arriving at the previous target when the engine
+         advances it to the next — no stutter, no overshoot. */
+      wrap.style.transition = 'transform 0.25s linear';
       const inner = makeSpriteHolder(BOMB_SIZE);
       inner.classList.add('breathe');
       inner.appendChild(bombSvg(false, BOMB_SIZE));
@@ -652,7 +653,7 @@ function renderBombs(view, bombs){
       /* Force layout to commit the new transform with transition:none, then
          re-enable the transition for subsequent steps. */
       void entry.wrap.offsetWidth;
-      entry.wrap.style.transition = 'transform 0.12s linear';
+      entry.wrap.style.transition = 'transform 0.25s linear';
     } else {
       entry.wrap.style.transform = `translate(${newX.toFixed(2)}px, ${newY.toFixed(2)}px)`;
     }

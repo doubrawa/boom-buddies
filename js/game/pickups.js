@@ -31,8 +31,10 @@ export const MAGNET_RADIUS = 4;
 export const MAGNET_STEP_INTERVAL = 0.25;
 /* How long the magnet effect stays active after pickup. */
 export const MAGNET_DURATION = 5;
-/* Kick: how often a kicked bomb advances one tile (seconds). */
-export const KICK_STEP_INTERVAL = 0.12;
+/* Kick: how often a kicked bomb advances one tile (seconds).  A
+   higher interval = slower bomb — current 0.25 makes a kicked bomb
+   roll at roughly walking pace instead of zipping across the board. */
+export const KICK_STEP_INTERVAL = 0.25;
 /* How long the kick ability stays active after pickup. */
 export const KICK_DURATION = 5;
 /* Earthquake: total duration and how often bombs jiggle a tile. */
