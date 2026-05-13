@@ -260,20 +260,23 @@ function attachTouchControls(section){
   };
 }
 
-/* Tap-on-board movement controls.  Touching anywhere on the board picks
-   a single cardinal direction based on which half of the board the
-   pointer is in (whichever axis has the larger offset from the centre
-   wins).  Dragging while held updates the direction.  Releases stop the
-   movement.  Direction is dispatched as P1's WASD keys to integrate
-   with the existing input scheme. */
-function attachBoardControls(section){
+/* Tap-on-screen movement controls.  Touching anywhere on the gameplay
+   screen — except the bomb-button area — picks a single cardinal
+   direction based on the pointer's offset from the board centre
+   (whichever axis is larger wins).  Dragging while held updates the
+   direction; release stops movement.  Direction is dispatched as P1's
+   WASD keys so the existing input system picks it up. */
+function attachScreenControls(section){
   const board = section.querySelector('#board');
   if(!board) return () => {};
+  const touchPad = section.querySelector('[data-touch]');
   const dispatch = (type, code) => window.dispatchEvent(new KeyboardEvent(type, { code }));
   let activeCode = null;
   let pointerId = null;
 
   function directionFromXY(clientX, clientY){
+    /* Reference is the board centre — that's where the player is looking
+       at, so "touch above the player → walk up" reads naturally. */
     const rect = board.getBoundingClientRect();
     const dx = clientX - (rect.left + rect.width / 2);
     const dy = clientY - (rect.top  + rect.height / 2);
@@ -287,10 +290,13 @@ function attachBoardControls(section){
     if(activeCode) dispatch('keydown', activeCode);
   }
   function onDown(e){
+    /* Bomb button keeps its own handler — leave touches that start on
+       it alone so the existing keydown('Space') logic fires there. */
+    if(touchPad && touchPad.contains(e.target)) return;
     e.preventDefault();
     if(pointerId !== null) return;     // single-finger movement
     pointerId = e.pointerId;
-    board.setPointerCapture(pointerId);
+    try { section.setPointerCapture(pointerId); } catch {}
     setDirection(directionFromXY(e.clientX, e.clientY));
   }
   function onMove(e){
@@ -299,33 +305,31 @@ function attachBoardControls(section){
   }
   function onUp(e){
     if(e.pointerId !== pointerId) return;
-    try { board.releasePointerCapture(pointerId); } catch {}
+    try { section.releasePointerCapture(pointerId); } catch {}
     pointerId = null;
     setDirection(null);
   }
 
-  board.addEventListener('pointerdown',   onDown);
-  board.addEventListener('pointermove',   onMove);
-  board.addEventListener('pointerup',     onUp);
-  board.addEventListener('pointercancel', onUp);
-  board.addEventListener('pointerleave',  onUp);
+  section.addEventListener('pointerdown',   onDown);
+  section.addEventListener('pointermove',   onMove);
+  section.addEventListener('pointerup',     onUp);
+  section.addEventListener('pointercancel', onUp);
   /* Prevent the browser's default scroll/pan gestures eating the touch. */
-  board.style.touchAction = 'none';
+  section.style.touchAction = 'none';
 
   return () => {
     if(activeCode){ dispatch('keyup', activeCode); activeCode = null; }
-    board.removeEventListener('pointerdown',   onDown);
-    board.removeEventListener('pointermove',   onMove);
-    board.removeEventListener('pointerup',     onUp);
-    board.removeEventListener('pointercancel', onUp);
-    board.removeEventListener('pointerleave',  onUp);
+    section.removeEventListener('pointerdown',   onDown);
+    section.removeEventListener('pointermove',   onMove);
+    section.removeEventListener('pointerup',     onUp);
+    section.removeEventListener('pointercancel', onUp);
   };
 }
 
 /* Compose the two touch wiring helpers into a single detach callable. */
 function attachAllTouch(section){
   const a = attachTouchControls(section);
-  const b = attachBoardControls(section);
+  const b = attachScreenControls(section);
   return () => { a(); b(); };
 }
 
