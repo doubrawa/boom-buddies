@@ -42,10 +42,10 @@ export function createPlayer(slot, schemeId, charId, controllerType, displayName
     passthrough: new Set(),
     /* Power-up state. */
     hasRemote:    false,
-    hasKick:      false,
+    kickUntil:    0,             // engine-elapsed seconds
     hasGlove:     false,
     hasIce:       false,
-    hasMagnet:    false,
+    magnetUntil:  0,             // engine-elapsed seconds
     shieldStacks: 0,
     ghostUntil:   0,             // engine-elapsed seconds
     slowUntil:    0,

@@ -29,8 +29,12 @@ export const SLOW_FACTOR = 0.4;
 export const MAGNET_RADIUS = 4;
 /* How often a magnet drags each pickup one tile closer (seconds). */
 export const MAGNET_STEP_INTERVAL = 0.25;
+/* How long the magnet effect stays active after pickup. */
+export const MAGNET_DURATION = 5;
 /* Kick: how often a kicked bomb advances one tile (seconds). */
 export const KICK_STEP_INTERVAL = 0.12;
+/* How long the kick ability stays active after pickup. */
+export const KICK_DURATION = 5;
 /* Earthquake: total duration and how often bombs jiggle a tile. */
 export const EARTHQUAKE_DURATION = 3;
 export const EARTHQUAKE_INTERVAL = 0.5;
@@ -74,10 +78,10 @@ export function applyPickup(player, type, ctx){
       ctx.slowOthers(player, SLOW_DURATION);
       break;
     case 'kick':
-      player.hasKick = true;
+      player.kickUntil = Math.max(player.kickUntil || 0, ctx.elapsed + KICK_DURATION);
       break;
     case 'magnet':
-      player.hasMagnet = true;
+      player.magnetUntil = Math.max(player.magnetUntil || 0, ctx.elapsed + MAGNET_DURATION);
       break;
     /* Confuse — flips the picker's own movement controls for a few
        seconds.  Self-debuff: a tempting but punishing pickup. */

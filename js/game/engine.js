@@ -216,10 +216,11 @@ export function createEngine(lobby, hooks, opts = {}){
         }
       }
 
-      /* Kick: if pressing into a bomb directly in front of us and hasKick,
-         start the bomb sliding in our move direction.  We still don't move
-         (the bomb still blocks us) — classic Bomberman foot-tap behaviour. */
-      if(p.hasKick && (r.dx !== 0 || r.dy !== 0)){
+      /* Kick: while the kick effect is active, pressing into a bomb
+         directly in front of us starts it sliding in our move direction.
+         We still don't move (the bomb still blocks us) — classic
+         Bomberman foot-tap behaviour. */
+      if(elapsed < (p.kickUntil || 0) && (r.dx !== 0 || r.dy !== 0)){
         const dirX = Math.abs(r.dx) >= Math.abs(r.dy) ? Math.sign(r.dx) : 0;
         const dirY = dirX === 0 ? Math.sign(r.dy) : 0;
         if(dirX !== 0 || dirY !== 0){
@@ -362,10 +363,11 @@ export function createEngine(lobby, hooks, opts = {}){
       }
     }
 
-    /* 2b. Magnet pull — players with hasMagnet drag nearby pickups one tile
-       closer along the dominant axis at MAGNET_STEP_INTERVAL cadence. */
+    /* 2b. Magnet pull — players whose magnet effect is active drag
+       nearby pickups one tile closer along the dominant axis at
+       MAGNET_STEP_INTERVAL cadence. */
     for(const holder of players){
-      if(!holder.alive || !holder.hasMagnet) continue;
+      if(!holder.alive || elapsed >= (holder.magnetUntil || 0)) continue;
       const hx = Math.floor(holder.x), hy = Math.floor(holder.y);
       for(const pu of pickups){
         const dx = hx - pu.x, dy = hy - pu.y;

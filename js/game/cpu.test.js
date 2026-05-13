@@ -21,8 +21,8 @@ function makePlayer(idx, sx, sy){
     x: sx + 0.5, y: sy + 0.5, speed: 4.5, facing: 'down',
     alive: true, bombMax: 1, bombsLive: 0, range: 2,
     passthrough: new Set(),
-    hasRemote: false, hasKick: false,
-    hasGlove: false, hasIce: false, hasMagnet: false,
+    hasRemote: false, kickUntil: 0,
+    hasGlove: false, hasIce: false, magnetUntil: 0,
     shieldStacks: 0, ghostUntil: 0, slowUntil: 0, collected: [],
   };
 }

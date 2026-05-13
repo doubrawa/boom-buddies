@@ -480,7 +480,7 @@ function createRemoteGame(lobby){
     x: 0, y: 0, alive: true,
     ghostUntil: 0, slowUntil: 0, shieldStacks: 0,
     bombMax: 1, bombsLive: 0, range: 2,
-    hasRemote:false, hasKick:false, hasMagnet:false,
+    hasRemote:false, kickUntil:0, magnetUntil:0,
     passthrough: new Set(), collected: [],
   }));
   return {
