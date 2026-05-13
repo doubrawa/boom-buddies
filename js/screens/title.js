@@ -28,7 +28,7 @@ export function render(ctx){
       </div>
 
       <div class="logo-wrap">
-        <h1 class="bigtitle">Boom Buddies</h1>
+        <h1 class="bigtitle">Mochi Mayhem</h1>
         <span class="subtitle">a cozy chaos game · 2-8 friends</span>
         <span class="logo-deco bomb" data-spr="bomb" data-size="100"></span>
         <span class="logo-deco spark" data-spr="spark" data-size="40"></span>

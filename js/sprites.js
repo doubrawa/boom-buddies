@@ -1,5 +1,5 @@
 /* ======================================================
-   BOOM BUDDIES — sprite library (v3 cozy / SVG)
+   MOCHI MAYHEM — sprite library (v3 cozy / SVG)
    Symbols are defined once in index.html as <svg><defs>.
    This module exposes helpers that return SVG <use>
    elements wrapped in a sized <svg>. ====================================================== */

@@ -1,4 +1,4 @@
-# Boom Buddies
+# Mochi Mayhem
 
 A cute pixel-art Bomberman clone for the browser. Pure HTML/CSS/JS — no build step, no framework. Designed to be hosted on GitHub Pages.
 

@@ -6,7 +6,7 @@ $root = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://localhost:$Port/")
 $listener.Start()
-Write-Host "Boom Buddies dev server" -ForegroundColor Cyan
+Write-Host "Mochi Mayhem dev server" -ForegroundColor Cyan
 Write-Host "Serving $root on http://localhost:$Port/"
 Write-Host "Press Ctrl+C to stop."
 
