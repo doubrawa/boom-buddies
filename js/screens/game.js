@@ -261,28 +261,59 @@ function attachTouchControls(section){
   };
 }
 
-/* Tap-on-screen movement controls.  Touching anywhere on the gameplay
-   screen — except the bomb-button area — picks a single cardinal
-   direction based on the pointer's offset from the board centre
-   (whichever axis is larger wins).  Dragging while held updates the
-   direction; release stops movement.  Direction is dispatched as P1's
-   WASD keys so the existing input system picks it up. */
+/* Tap-on-screen movement controls.  The "play touch region" runs from
+   the TOP of the board to the bottom of the viewport (everything from
+   the board downward, full screen width — the topbar with the timer
+   and Forfeit stays untouched).  Inside that region the outer 30 %
+   bands map to cardinal directions:
+
+       ┌─────────────────┐  topbar (excluded)
+       ╞══════╦═══╦══════╡  top of board
+       │      │ ▲ │      │
+       │  ◀   │   │   ▶  │  left/right 30 % of viewport width
+       │      │ ▼ │      │
+       ╞══════╩═══╩══════╡
+       │       BOMB      │  bomb pad still keeps its own handler
+       └─────────────────┘
+
+   Touches in the middle 40 % stay idle.  Bands overlap in the corners;
+   whichever band the touch sits deepest into wins.  Direction is
+   dispatched as P1's WASD keys so the existing input system picks it
+   up. */
 function attachScreenControls(section){
   const board = section.querySelector('#board');
   if(!board) return () => {};
   const touchPad = section.querySelector('[data-touch]');
   const dispatch = (type, code) => window.dispatchEvent(new KeyboardEvent(type, { code }));
+  const BAND = 0.30;
   let activeCode = null;
   let pointerId = null;
 
   function directionFromXY(clientX, clientY){
-    /* Reference is the board centre — that's where the player is looking
-       at, so "touch above the player → walk up" reads naturally. */
-    const rect = board.getBoundingClientRect();
-    const dx = clientX - (rect.left + rect.width / 2);
-    const dy = clientY - (rect.top  + rect.height / 2);
-    if(Math.abs(dx) > Math.abs(dy)) return dx < 0 ? 'KeyA' : 'KeyD';
-    return dy < 0 ? 'KeyW' : 'KeyS';
+    const boardRect = board.getBoundingClientRect();
+    const playableTop = boardRect.top;
+    /* Touches above the board live in the topbar — never count. */
+    if(clientY < playableTop) return null;
+    const W = window.innerWidth;
+    const H = window.innerHeight - playableTop;
+    const xBand = W * BAND;
+    const yBand = H * BAND;
+    let dir = null, depth = 0;
+    if(clientX < xBand){
+      const d = (xBand - clientX) / xBand;
+      if(d > depth){ depth = d; dir = 'KeyA'; }
+    } else if(clientX > W - xBand){
+      const d = (clientX - (W - xBand)) / xBand;
+      if(d > depth){ depth = d; dir = 'KeyD'; }
+    }
+    if(clientY < playableTop + yBand){
+      const d = (playableTop + yBand - clientY) / yBand;
+      if(d > depth){ depth = d; dir = 'KeyW'; }
+    } else if(clientY > window.innerHeight - yBand){
+      const d = (clientY - (window.innerHeight - yBand)) / yBand;
+      if(d > depth){ depth = d; dir = 'KeyS'; }
+    }
+    return dir;
   }
   function setDirection(code){
     if(code === activeCode) return;
@@ -299,6 +330,9 @@ function attachScreenControls(section){
        event otherwise.  Buttons and explicit data-action elements get
        their own click handlers, so we just step aside. */
     if(e.target.closest('button, a, input, select, [data-action]')) return;
+    /* Touches in the topbar (above the board) belong to the timer /
+       round-pill / live-pill UI — don't capture them as movement. */
+    if(e.clientY < board.getBoundingClientRect().top) return;
     e.preventDefault();
     if(pointerId !== null) return;     // single-finger movement
     pointerId = e.pointerId;
