@@ -49,7 +49,10 @@ function computeTileSize(fieldW, fieldH){
      so basically no horizontal chrome.  Vertical chrome = topbar (~55) +
      bomb button area (~120) + safe-area buffer (~30). */
   const hReserve = isMobile ? 8   : 600;
-  const vReserve = isMobile ? 220 : 200;
+  /* Mobile vReserve = topbar (~70) + bomb pad (~110) + d-pad (~200) +
+     paddings/margins.  Bigger reserve than before because the d-pad
+     control area below the bomb button now claims real estate too. */
+  const vReserve = isMobile ? 460 : 200;
   const availW = Math.max(220, (isMobile ? window.innerWidth : appW) - hReserve);
   const availH = Math.max(220, window.innerHeight - vReserve);
   const ts = Math.min(Math.floor(availW / fieldW), Math.floor(availH / fieldH));
@@ -219,6 +222,12 @@ function gameShell(match, initialSecs){
         <div class="touch-pad" data-touch>
           <button class="bomb" data-key="Space">BOMB</button>
         </div>
+        <div class="dpad" data-dpad>
+          <span class="zone up"    data-dir="KeyW"></span>
+          <span class="zone right" data-dir="KeyD"></span>
+          <span class="zone down"  data-dir="KeyS"></span>
+          <span class="zone left"  data-dir="KeyA"></span>
+        </div>
       </div>
       <div class="gpcol right" id="rightHud">
         <div class="pup-row">
@@ -261,82 +270,50 @@ function attachTouchControls(section){
   };
 }
 
-/* Tap-on-screen movement controls.  The "play touch region" runs from
-   the TOP of the board to the bottom of the viewport (everything from
-   the board downward, full screen width — the topbar with the timer
-   and Forfeit stays untouched).  Inside that region the outer 30 %
-   bands map to cardinal directions:
-
-       ┌─────────────────┐  topbar (excluded)
-       ╞══════╦═══╦══════╡  top of board
-       │      │ ▲ │      │
-       │  ◀   │   │   ▶  │  left/right 30 % of viewport width
-       │      │ ▼ │      │
-       ╞══════╩═══╩══════╡
-       │       BOMB      │  bomb pad still keeps its own handler
-       └─────────────────┘
-
-   Touches in the middle 40 % stay idle.  Bands overlap in the corners;
-   whichever band the touch sits deepest into wins.  Direction is
-   dispatched as P1's WASD keys so the existing input system picks it
-   up. */
-function attachScreenControls(section){
-  const board = section.querySelector('#board');
-  if(!board) return () => {};
-  const touchPad = section.querySelector('[data-touch]');
+/* Visible D-pad control beneath the bomb button.  The pad is split
+   into four equal triangles by its two diagonals; each triangle drives
+   one cardinal direction (W/A/S/D).  Touches anywhere on the pad
+   resolve to the triangle they're in — the whole area is clickable so
+   each direction gets exactly 25 % of the surface.  Dragging across
+   triangles updates the active direction; release stops movement. */
+function attachDpadControls(section){
+  const dpad = section.querySelector('[data-dpad]');
+  if(!dpad) return () => {};
   const dispatch = (type, code) => window.dispatchEvent(new KeyboardEvent(type, { code }));
-  const BAND = 0.30;
+  const zones = dpad.querySelectorAll('.zone');
   let activeCode = null;
   let pointerId = null;
 
   function directionFromXY(clientX, clientY){
-    const boardRect = board.getBoundingClientRect();
-    const playableTop = boardRect.top;
-    /* Touches above the board live in the topbar — never count. */
-    if(clientY < playableTop) return null;
-    const W = window.innerWidth;
-    const H = window.innerHeight - playableTop;
-    const xBand = W * BAND;
-    const yBand = H * BAND;
-    let dir = null, depth = 0;
-    if(clientX < xBand){
-      const d = (xBand - clientX) / xBand;
-      if(d > depth){ depth = d; dir = 'KeyA'; }
-    } else if(clientX > W - xBand){
-      const d = (clientX - (W - xBand)) / xBand;
-      if(d > depth){ depth = d; dir = 'KeyD'; }
-    }
-    if(clientY < playableTop + yBand){
-      const d = (playableTop + yBand - clientY) / yBand;
-      if(d > depth){ depth = d; dir = 'KeyW'; }
-    } else if(clientY > window.innerHeight - yBand){
-      const d = (clientY - (window.innerHeight - yBand)) / yBand;
-      if(d > depth){ depth = d; dir = 'KeyS'; }
-    }
-    return dir;
+    const r = dpad.getBoundingClientRect();
+    const x = (clientX - r.left) / r.width;     // 0..1
+    const y = (clientY - r.top)  / r.height;    // 0..1
+    if(x < 0 || x > 1 || y < 0 || y > 1) return null;
+    /* Split the unit square by its two diagonals (y == x, y == 1-x). */
+    const aboveMain = y < x;        // right of the top-left → bottom-right diagonal
+    const aboveAnti = y < 1 - x;    // above the top-right → bottom-left diagonal
+    if( aboveMain &&  aboveAnti) return 'KeyW';   // top triangle
+    if(!aboveMain && !aboveAnti) return 'KeyS';   // bottom triangle
+    if( aboveMain && !aboveAnti) return 'KeyD';   // right triangle
+    if(!aboveMain &&  aboveAnti) return 'KeyA';   // left triangle
+    return null;
   }
   function setDirection(code){
     if(code === activeCode) return;
     if(activeCode) dispatch('keyup', activeCode);
     activeCode = code;
     if(activeCode) dispatch('keydown', activeCode);
+    /* Highlight whichever triangle matches the active direction. */
+    for(const z of zones){
+      if(activeCode && z.dataset.dir === activeCode) z.classList.add('active');
+      else z.classList.remove('active');
+    }
   }
   function onDown(e){
-    /* Bomb button keeps its own handler — leave touches that start on
-       it alone so the existing keydown('Space') logic fires there. */
-    if(touchPad && touchPad.contains(e.target)) return;
-    /* Don't swallow clicks on UI controls (Forfeit, etc.) — the
-       section-level preventDefault below would suppress their click
-       event otherwise.  Buttons and explicit data-action elements get
-       their own click handlers, so we just step aside. */
-    if(e.target.closest('button, a, input, select, [data-action]')) return;
-    /* Touches in the topbar (above the board) belong to the timer /
-       round-pill / live-pill UI — don't capture them as movement. */
-    if(e.clientY < board.getBoundingClientRect().top) return;
     e.preventDefault();
-    if(pointerId !== null) return;     // single-finger movement
+    if(pointerId !== null) return;
     pointerId = e.pointerId;
-    try { section.setPointerCapture(pointerId); } catch {}
+    try { dpad.setPointerCapture(pointerId); } catch {}
     setDirection(directionFromXY(e.clientX, e.clientY));
   }
   function onMove(e){
@@ -345,31 +322,29 @@ function attachScreenControls(section){
   }
   function onUp(e){
     if(e.pointerId !== pointerId) return;
-    try { section.releasePointerCapture(pointerId); } catch {}
+    try { dpad.releasePointerCapture(pointerId); } catch {}
     pointerId = null;
     setDirection(null);
   }
 
-  section.addEventListener('pointerdown',   onDown);
-  section.addEventListener('pointermove',   onMove);
-  section.addEventListener('pointerup',     onUp);
-  section.addEventListener('pointercancel', onUp);
-  /* Prevent the browser's default scroll/pan gestures eating the touch. */
-  section.style.touchAction = 'none';
+  dpad.addEventListener('pointerdown',   onDown);
+  dpad.addEventListener('pointermove',   onMove);
+  dpad.addEventListener('pointerup',     onUp);
+  dpad.addEventListener('pointercancel', onUp);
 
   return () => {
     if(activeCode){ dispatch('keyup', activeCode); activeCode = null; }
-    section.removeEventListener('pointerdown',   onDown);
-    section.removeEventListener('pointermove',   onMove);
-    section.removeEventListener('pointerup',     onUp);
-    section.removeEventListener('pointercancel', onUp);
+    dpad.removeEventListener('pointerdown',   onDown);
+    dpad.removeEventListener('pointermove',   onMove);
+    dpad.removeEventListener('pointerup',     onUp);
+    dpad.removeEventListener('pointercancel', onUp);
   };
 }
 
 /* Compose the two touch wiring helpers into a single detach callable. */
 function attachAllTouch(section){
   const a = attachTouchControls(section);
-  const b = attachScreenControls(section);
+  const b = attachDpadControls(section);
   return () => { a(); b(); };
 }
 

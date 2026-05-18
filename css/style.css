@@ -118,6 +118,33 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
 }
 .touch-pad .bomb.held{transform:translateY(3px);box-shadow:0 3px 0 var(--berry)}
 
+/* ---- D-pad — visible directional control beneath the bomb button.
+   Hidden on desktop; shown on touch devices via the media query
+   below.  The container is split into four equal triangles, each
+   mapped to one cardinal direction.  Pointer events on the container
+   itself drive the input; the four .zone children are purely visual
+   (background + arrow). */
+.dpad{display:none}
+.dpad .zone{
+  position:absolute; inset:0;
+  pointer-events:none;
+  display:flex;align-items:center;justify-content:center;
+}
+.dpad .zone::after{
+  content:""; display:block;
+  width:36px; height:36px;
+  background:no-repeat center/contain;
+}
+.dpad .zone.up    { clip-path:polygon(0% 0%, 100% 0%, 50% 50%); background:var(--peach2); }
+.dpad .zone.right { clip-path:polygon(100% 0%, 100% 100%, 50% 50%); background:var(--mint2); }
+.dpad .zone.down  { clip-path:polygon(100% 100%, 0% 100%, 50% 50%); background:var(--sky2); }
+.dpad .zone.left  { clip-path:polygon(0% 100%, 0% 0%, 50% 50%); background:var(--butter2); }
+.dpad .zone.up::after    { background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 4 L20 16 L4 16 Z' fill='%232b2150'/%3E%3C/svg%3E"); margin-bottom:60%; }
+.dpad .zone.right::after { background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 12 L8 4 L8 20 Z' fill='%232b2150'/%3E%3C/svg%3E"); margin-left:60%; }
+.dpad .zone.down::after  { background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 20 L4 8 L20 8 Z' fill='%232b2150'/%3E%3C/svg%3E"); margin-top:60%; }
+.dpad .zone.left::after  { background-image:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12 L16 4 L16 20 Z' fill='%232b2150'/%3E%3C/svg%3E"); margin-right:60%; }
+.dpad .zone.active{filter:brightness(0.86)}
+
 @media (hover:none) and (pointer:coarse){
   /* Real touch devices: pin the touch-pad to the bottom of the screen
      for legacy non-gameplay screens.  The gameplay screen's own mobile
@@ -131,6 +158,9 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
     z-index:50;
     pointer-events:none;
   }
+  /* The D-pad is gameplay-only — shown beneath the bomb button on
+     touch devices, hidden anywhere else. */
+  .dpad{display:block}
 }
 
 /* =================================================
@@ -555,6 +585,19 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   .screen.gp-screen .touch-pad .bomb{
     width:96px;height:96px;font-size:16px;
     justify-self:auto;align-self:auto;
+  }
+  /* D-pad fills whatever vertical space is left below the bomb pad on
+     mobile.  display:block is only granted by the touch-device media
+     query below, so a desktop browser resized below 900 px keeps it
+     hidden along with the bomb button. */
+  .screen.gp-screen .dpad{
+    flex:1;
+    min-height:140px;
+    position:relative;
+    overflow:hidden;
+    border-top:3px solid var(--ink);
+    touch-action:none;
+    user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
   }
   /* Body padding + min-height:100vh would push the .screen.gp-screen
      beyond the visible viewport, producing the bottom cutoff + scroll
