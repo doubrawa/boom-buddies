@@ -589,9 +589,16 @@ img.spr,canvas.spr{image-rendering:pixelated;display:block}
   /* D-pad fills whatever vertical space is left below the bomb pad on
      mobile.  display:block is only granted by the touch-device media
      query below, so a desktop browser resized below 900 px keeps it
-     hidden along with the bomb button. */
+     hidden along with the bomb button.
+
+     align-self:stretch counteracts the parent .stage's
+     align-items:center (which would otherwise shrink the dpad to its
+     content width — which is 0 because the .zone children are
+     position:absolute and contribute nothing to intrinsic width). */
   .screen.gp-screen .dpad{
     flex:1;
+    align-self:stretch;
+    width:100%;
     min-height:140px;
     position:relative;
     overflow:hidden;
